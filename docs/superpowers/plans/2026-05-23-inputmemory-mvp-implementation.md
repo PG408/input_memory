@@ -6,36 +6,35 @@
 
 **Architecture:** The app uses a small SwiftUI/AppKit shell around a testable capture core. Platform-specific Accessibility and foreground-app APIs are wrapped behind protocols so turn lifecycle, `observed_text` overwrite rules, persistence, and Markdown export can be tested without live macOS UI state.
 
-**Tech Stack:** Swift 5.10+, SwiftPM, SwiftUI, AppKit, ApplicationServices Accessibility APIs, SQLite3, XCTest.
+**Tech Stack:** Swift 5.10+, SwiftPM, SwiftUI, AppKit, ApplicationServices Accessibility APIs, SQLite3, executable self-test target.
+
+**Execution note:** The local CommandLineTools Swift environment cannot import `XCTest` or Swift `Testing`. During inline execution, the testable logic was split into `InputMemoryCore`, and automated checks were implemented in the `InputMemorySelfTest` executable. Use `swift run InputMemorySelfTest` instead of `swift test` in this workspace unless a full Xcode toolchain with XCTest is installed and selected.
 
 ---
 
 ## File Structure
 
-- `Package.swift`: SwiftPM package with one executable target and one test target.
+- `Package.swift`: SwiftPM package with one core library target and two executable targets.
 - `Sources/InputMemory/App/InputMemoryApp.swift`: SwiftUI app entrypoint with `MenuBarExtra`, viewer window, and app delegate.
 - `Sources/InputMemory/App/AppDelegate.swift`: macOS lifecycle hooks for shutdown flush and activation policy.
-- `Sources/InputMemory/Models/Turn.swift`: persisted turn model and enums.
-- `Sources/InputMemory/Models/ActiveTurn.swift`: in-memory active turn state and overwrite rules.
-- `Sources/InputMemory/Models/CaptureContext.swift`: app, window, and focused-control context snapshot models.
-- `Sources/InputMemory/Support/AppPaths.swift`: Application Support and export-directory paths.
-- `Sources/InputMemory/Support/Hashing.swift`: SHA-256 text hash helper.
-- `Sources/InputMemory/Stores/TurnStore.swift`: SQLite-backed turn persistence.
-- `Sources/InputMemory/Services/AccessibilityPermissionService.swift`: Accessibility permission checks and System Settings opener.
-- `Sources/InputMemory/Services/AccessibilityClient.swift`: focused element inspection and text reads.
-- `Sources/InputMemory/Services/ForegroundAppMonitor.swift`: foreground app change monitoring.
-- `Sources/InputMemory/Services/CaptureCoordinator.swift`: capture state machine, polling, pause/resume, shutdown recovery.
-- `Sources/InputMemory/Services/MarkdownExporter.swift`: T-day-trigger exports T-1-day Markdown.
+- `Sources/InputMemoryCore/Models/Turn.swift`: persisted turn model and enums.
+- `Sources/InputMemoryCore/Models/ActiveTurn.swift`: in-memory active turn state and overwrite rules.
+- `Sources/InputMemoryCore/Models/CaptureContext.swift`: app, window, and focused-control context snapshot models.
+- `Sources/InputMemoryCore/Support/AppPaths.swift`: Application Support and export-directory paths.
+- `Sources/InputMemoryCore/Support/Hashing.swift`: SHA-256 text hash helper.
+- `Sources/InputMemoryCore/Stores/TurnStore.swift`: SQLite-backed turn persistence.
+- `Sources/InputMemoryCore/Services/AccessibilityPermissionService.swift`: Accessibility permission checks and System Settings opener.
+- `Sources/InputMemoryCore/Services/AccessibilityClient.swift`: focused element inspection and text reads.
+- `Sources/InputMemoryCore/Services/ForegroundAppMonitor.swift`: foreground app change monitoring.
+- `Sources/InputMemoryCore/Services/CaptureCoordinator.swift`: capture state machine, polling, pause/resume, shutdown recovery.
+- `Sources/InputMemoryCore/Services/MarkdownExporter.swift`: T-day-trigger exports T-1-day Markdown.
 - `Sources/InputMemory/Stores/AppState.swift`: observable UI state and service orchestration.
 - `Sources/InputMemory/Views/MenuBarContentView.swift`: menu bar controls.
 - `Sources/InputMemory/Views/ViewerWindowView.swift`: viewer shell.
 - `Sources/InputMemory/Views/TurnListView.swift`: recent turn list.
 - `Sources/InputMemory/Views/TurnDetailView.swift`: full-text detail panel.
 - `Sources/InputMemory/Views/PermissionView.swift`: authorization prompt.
-- `Tests/InputMemoryTests/ActiveTurnTests.swift`: overwrite and turn-ending rules.
-- `Tests/InputMemoryTests/TurnStoreTests.swift`: SQLite persistence tests.
-- `Tests/InputMemoryTests/MarkdownExporterTests.swift`: Markdown export behavior.
-- `Tests/InputMemoryTests/CaptureCoordinatorTests.swift`: capture lifecycle using fake clients.
+- `Sources/InputMemorySelfTest/main.swift`: executable automated checks for turn rules, SQLite persistence, Markdown export, and capture lifecycle.
 - `script/build_and_run.sh`: local build/run helper.
 
 ## Task 1: Scaffold SwiftPM macOS App
