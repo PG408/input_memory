@@ -1,0 +1,95 @@
+import Foundation
+
+public final class MarkdownExporter {
+    private let store: TurnStore
+    private let exportDirectory: URL
+    private let calendar: Calendar
+
+    public init(
+        store: TurnStore,
+        exportDirectory: URL = AppPaths.defaultExportDirectory,
+        calendar: Calendar = .current
+    ) {
+        self.store = store
+        self.exportDirectory = exportDirectory
+        self.calendar = calendar
+    }
+
+    @discardableResult
+    public func exportPreviousDay(triggeredAt: Date = Date()) throws -> URL {
+        let targetDay = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: triggeredAt))!
+        let turns = try store.fetchTurns(on: targetDay, calendar: calendar)
+        try AppPaths.ensureDirectory(exportDirectory)
+
+        let outputURL = exportDirectory.appendingPathComponent(Self.fileName(for: targetDay))
+        try render(day: targetDay, generatedAt: triggeredAt, turns: turns)
+            .write(to: outputURL, atomically: true, encoding: .utf8)
+        return outputURL
+    }
+
+    func render(day: Date, generatedAt: Date, turns: [Turn]) -> String {
+        let grouped = Dictionary(grouping: turns) { turn in
+            [
+                turn.context.appName,
+                turn.context.bundleID,
+                turn.context.windowTitle
+            ].joined(separator: "|")
+        }
+
+        var lines: [String] = [
+            "# InputMemory Export: \(Self.dayFormatter.string(from: day))",
+            "",
+            "- Generated At: \(Self.timestampFormatter.string(from: generatedAt))",
+            "- Turn Count: \(turns.count)",
+            ""
+        ]
+
+        for key in grouped.keys.sorted() {
+            guard let sessionTurns = grouped[key]?.sorted(by: { $0.startedAt < $1.startedAt }),
+                  let first = sessionTurns.first else {
+                continue
+            }
+            lines.append("## \(first.context.appName) | \(first.context.windowTitle)")
+            lines.append("")
+            lines.append("- Bundle ID: \(first.context.bundleID)")
+            lines.append("- Turns: \(sessionTurns.count)")
+            lines.append("")
+
+            for turn in sessionTurns {
+                lines.append("### Turn \(turn.id ?? 0) | \(Self.timestampFormatter.string(from: turn.startedAt))")
+                lines.append("")
+                lines.append("- Capture Status: \(turn.captureStatus.rawValue)")
+                lines.append("- End Reason: \(turn.endReason?.rawValue ?? "active")")
+                lines.append("- Ended Empty: \(turn.endedEmpty)")
+                lines.append("- Text Length: \(turn.observedTextLength)")
+                lines.append("")
+                lines.append("```text")
+                lines.append(turn.observedText)
+                lines.append("```")
+                lines.append("")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private static func fileName(for day: Date) -> String {
+        "\(dayFormatter.string(from: day)).md"
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
+}

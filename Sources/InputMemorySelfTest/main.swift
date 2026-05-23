@@ -8,6 +8,9 @@ enum InputMemorySelfTest {
         try testActiveTurnRules()
         try testTurnStoreInsertUpdate()
         try testCloseUnclosedTurns()
+        try testMarkdownExporter()
+        try testCaptureCoordinatorTextCleared()
+        try testCaptureCoordinatorPause()
         print("InputMemorySelfTest passed")
     }
 
@@ -61,6 +64,52 @@ enum InputMemorySelfTest {
         try expect(recent[0].endedAt == now, "unclosed turn endedAt should use lastObservedAt")
     }
 
+    private static func testMarkdownExporter() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = try TurnStore(path: directory.appendingPathComponent("test.sqlite").path)
+        let targetDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 22))!
+        var turn = Turn.fixture(observedText: "# hello\nbody", at: targetDay.addingTimeInterval(3600))
+        turn.id = try store.insert(turn)
+
+        let exporter = MarkdownExporter(store: store, exportDirectory: directory)
+        let outputURL = try exporter.exportPreviousDay(triggeredAt: targetDay.addingTimeInterval(86_400))
+
+        let markdown = try String(contentsOf: outputURL, encoding: .utf8)
+        try expect(markdown.contains("# InputMemory Export: 2026-05-22"), "export should use previous day")
+        try expect(markdown.contains("## TestApp | Test Window"), "export should group by app and window")
+        try expect(markdown.contains("```text\n# hello\nbody\n```"), "export should fence observed text")
+    }
+
+    private static func testCaptureCoordinatorTextCleared() throws {
+        let store = try TurnStore(path: temporaryDatabasePath())
+        let coordinator = CaptureCoordinator(
+            store: store,
+            reader: FakeReader(results: [.readable("hello"), .empty])
+        )
+        coordinator.startCandidate(.fixture(), now: .fixture)
+        coordinator.tick(now: .fixture)
+        coordinator.tick(now: .fixture.addingTimeInterval(1))
+
+        let turns = try store.fetchRecent(limit: 10)
+        try expect(turns.count == 1, "coordinator should insert one turn")
+        try expect(turns[0].observedText == "hello", "text_cleared should keep last non-empty text")
+        try expect(turns[0].endReason == .textCleared, "empty after non-empty should end as text_cleared")
+        try expect(turns[0].endedEmpty, "text_cleared turn should mark endedEmpty")
+    }
+
+    private static func testCaptureCoordinatorPause() throws {
+        let store = try TurnStore(path: temporaryDatabasePath())
+        let coordinator = CaptureCoordinator(store: store, reader: FakeReader(results: [.readable("draft")]))
+        coordinator.startCandidate(.fixture(), now: .fixture)
+        coordinator.tick(now: .fixture)
+        coordinator.startRecording()
+        coordinator.pause(now: .fixture.addingTimeInterval(2))
+
+        let turns = try store.fetchRecent(limit: 10)
+        try expect(turns[0].endReason == .paused, "pause should end active turn")
+    }
+
     private static func temporaryDatabasePath() -> String {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -105,6 +154,31 @@ extension CaptureContext {
             controlFingerprint: "fixture",
             isHeuristicTextControl: false
         )
+    }
+}
+
+extension FocusedTextCandidate {
+    static func fixture() -> FocusedTextCandidate {
+        FocusedTextCandidate(
+            element: AXUIElementCreateSystemWide(),
+            context: .fixture()
+        )
+    }
+}
+
+private final class FakeReader: AccessibilityReading {
+    private var results: [TextReadResult]
+
+    init(results: [TextReadResult]) {
+        self.results = results
+    }
+
+    func focusedTextCandidate(for app: ForegroundAppSnapshot) -> FocusedTextCandidate? {
+        .fixture()
+    }
+
+    func readText(from candidate: FocusedTextCandidate) -> TextReadResult {
+        results.isEmpty ? .empty : results.removeFirst()
     }
 }
 
