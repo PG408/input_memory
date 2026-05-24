@@ -26,6 +26,10 @@ let package = Package(
         .executableTarget(
             name: "InputMemorySelfTest",
             dependencies: ["InputMemoryCore"]
+        ),
+        .testTarget(
+            name: "InputMemoryTests",
+            dependencies: ["InputMemoryCore"]
         )
     ]
 )

@@ -6,15 +6,15 @@
 
 **Architecture:** The app uses a small SwiftUI/AppKit shell around a testable capture core. Platform-specific Accessibility and foreground-app APIs are wrapped behind protocols so turn lifecycle, `observed_text` overwrite rules, persistence, and Markdown export can be tested without live macOS UI state.
 
-**Tech Stack:** Swift 5.10+, SwiftPM, SwiftUI, AppKit, ApplicationServices Accessibility APIs, SQLite3, executable self-test target.
+**Tech Stack:** Swift 5.10+, SwiftPM, SwiftUI, AppKit, ApplicationServices Accessibility APIs, SQLite3, XCTest, executable self-test target.
 
-**Execution note:** The local CommandLineTools Swift environment cannot import `XCTest` or Swift `Testing`. During inline execution, the testable logic was split into `InputMemoryCore`, and automated checks were implemented in the `InputMemorySelfTest` executable. Use `swift run InputMemorySelfTest` instead of `swift test` in this workspace unless a full Xcode toolchain with XCTest is installed and selected.
+**Execution note:** The CommandLineTools-only Swift environment cannot import `XCTest` or Swift `Testing`. After Xcode was installed, standard XCTest verification works with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`. `InputMemorySelfTest` remains available as a fallback when XCTest is unavailable.
 
 ---
 
 ## File Structure
 
-- `Package.swift`: SwiftPM package with one core library target and two executable targets.
+- `Package.swift`: SwiftPM package with one core library target, two executable targets, and one XCTest target.
 - `Sources/InputMemory/App/InputMemoryApp.swift`: SwiftUI app entrypoint with `MenuBarExtra`, viewer window, and app delegate.
 - `Sources/InputMemory/App/AppDelegate.swift`: macOS lifecycle hooks for shutdown flush and activation policy.
 - `Sources/InputMemoryCore/Models/Turn.swift`: persisted turn model and enums.
@@ -34,7 +34,8 @@
 - `Sources/InputMemory/Views/TurnListView.swift`: recent turn list.
 - `Sources/InputMemory/Views/TurnDetailView.swift`: full-text detail panel.
 - `Sources/InputMemory/Views/PermissionView.swift`: authorization prompt.
-- `Sources/InputMemorySelfTest/main.swift`: executable automated checks for turn rules, SQLite persistence, Markdown export, and capture lifecycle.
+- `Sources/InputMemorySelfTest/main.swift`: executable fallback checks for turn rules, SQLite persistence, Markdown export, and capture lifecycle.
+- `Tests/InputMemoryTests/*.swift`: standard XCTest coverage for turn rules, SQLite persistence, Markdown export, and capture lifecycle.
 - `script/build_and_run.sh`: local build/run helper.
 
 ## Task 1: Scaffold SwiftPM macOS App

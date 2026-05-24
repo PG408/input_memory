@@ -18,9 +18,13 @@ InputMemory is a local macOS menu bar app that records text observable from the 
 ## Verify
 
 ```bash
-swift run InputMemorySelfTest
-swift build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
+
+If Xcode is selected globally with `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, the `DEVELOPER_DIR=...` prefix is not needed.
+
+`swift run InputMemorySelfTest` remains available as a lightweight fallback in environments without XCTest.
 
 ## Permissions
 
