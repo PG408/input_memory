@@ -84,7 +84,42 @@ public final class AccessibilityClient: AccessibilityReading {
         var size: CFTypeRef?
         AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &position)
         AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &size)
-        return "\(String(describing: position))|\(String(describing: size))"
+        let positionText = pointDescription(from: position)
+        let sizeText = sizeDescription(from: size)
+        guard positionText != nil || sizeText != nil else {
+            return nil
+        }
+        return "\(positionText ?? "unknown-position")|\(sizeText ?? "unknown-size")"
+    }
+
+    private func pointDescription(from value: CFTypeRef?) -> String? {
+        guard let value else {
+            return nil
+        }
+        let axValue = unsafeBitCast(value, to: AXValue.self)
+        guard AXValueGetType(axValue) == .cgPoint else {
+            return nil
+        }
+        var point = CGPoint.zero
+        guard AXValueGetValue(axValue, .cgPoint, &point) else {
+            return nil
+        }
+        return "x:\(Int(point.x)) y:\(Int(point.y))"
+    }
+
+    private func sizeDescription(from value: CFTypeRef?) -> String? {
+        guard let value else {
+            return nil
+        }
+        let axValue = unsafeBitCast(value, to: AXValue.self)
+        guard AXValueGetType(axValue) == .cgSize else {
+            return nil
+        }
+        var size = CGSize.zero
+        guard AXValueGetValue(axValue, .cgSize, &size) else {
+            return nil
+        }
+        return "w:\(Int(size.width)) h:\(Int(size.height))"
     }
 
     private func fingerprint(app: ForegroundAppSnapshot, role: String?, frame: String?) -> String {

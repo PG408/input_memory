@@ -37,4 +37,5 @@ cat > "${APP_BUNDLE}/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+/usr/bin/codesign --force --sign - --identifier "${BUNDLE_ID}" "${APP_BUNDLE}"
 /usr/bin/open -n "${APP_BUNDLE}"
