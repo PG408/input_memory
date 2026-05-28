@@ -37,7 +37,7 @@ public final class MarkdownExporter {
                 role: turn.context.controlRole,
                 subrole: turn.context.controlSubrole,
                 value: turn.observedText
-            )
+            ) && !PlaceholderPolicy.isPlaceholder(turn.observedText, context: turn.context)
         }
         let exportTurns = deduplicateAdjacent(filteredTurns)
 

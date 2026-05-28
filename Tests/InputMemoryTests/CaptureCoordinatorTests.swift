@@ -19,6 +19,26 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertTrue(turns[0].endedEmpty)
     }
 
+    func testPlaceholderEndsTurnWithoutOverwritingPersistedText() throws {
+        let store = try TurnStore(path: temporaryDatabasePath())
+        let coordinator = CaptureCoordinator(
+            store: store,
+            reader: FakeReader(results: [.readable("question"), .readable("Ask for follow-up changes")])
+        )
+        coordinator.startCandidate(
+            .fixture(context: .fixture(appName: "Codex", bundleID: "com.openai.codex")),
+            now: .fixture
+        )
+        coordinator.tick(now: .fixture)
+        coordinator.tick(now: .fixture.addingTimeInterval(1))
+
+        let turns = try store.fetchRecent(limit: 10)
+        XCTAssertEqual(turns.count, 1)
+        XCTAssertEqual(turns[0].observedText, "question")
+        XCTAssertEqual(turns[0].endReason, .textCleared)
+        XCTAssertTrue(turns[0].endedEmpty)
+    }
+
     func testPauseEndsActiveTurn() throws {
         let store = try TurnStore(path: temporaryDatabasePath())
         let coordinator = CaptureCoordinator(store: store, reader: FakeReader(results: [.readable("draft")]))

@@ -10,6 +10,7 @@ enum InputMemorySelfTest {
         try testCloseUnclosedTurns()
         try testMarkdownExporter()
         try testCaptureCoordinatorTextCleared()
+        try testCaptureCoordinatorPlaceholder()
         try testCaptureCoordinatorPause()
         print("InputMemorySelfTest passed")
     }
@@ -31,6 +32,24 @@ enum InputMemorySelfTest {
         let emptyTransition = emptyTurn.applyReadResult(.empty, at: .fixture)
         try expect(emptyTurn.observedText == "", "never-non-empty turn should keep empty observedText")
         try expect(emptyTransition == .continueTurn, "initial empty turn should continue")
+
+        var placeholderTurn = ActiveTurn(
+            context: .fixture(appName: "Codex", bundleID: "com.openai.codex"),
+            startedAt: .fixture
+        )
+        placeholderTurn.applyReadResult(.readable("actual question"), at: .fixture)
+        let placeholderTransition = placeholderTurn.applyReadResult(
+            .readable("Ask for follow-up changes"),
+            at: .fixture.addingTimeInterval(1)
+        )
+        try expect(
+            placeholderTurn.observedText == "actual question",
+            "placeholder text must not overwrite non-empty observedText"
+        )
+        try expect(
+            placeholderTransition == .endTurn(.textCleared),
+            "placeholder after non-empty should end turn"
+        )
     }
 
     private static func testTurnStoreInsertUpdate() throws {
@@ -102,6 +121,24 @@ enum InputMemorySelfTest {
         try expect(turns[0].endedEmpty, "text_cleared turn should mark endedEmpty")
     }
 
+    private static func testCaptureCoordinatorPlaceholder() throws {
+        let store = try TurnStore(path: temporaryDatabasePath())
+        let coordinator = CaptureCoordinator(
+            store: store,
+            reader: FakeReader(results: [.readable("question"), .readable("Ask for follow-up changes")])
+        )
+        coordinator.startCandidate(
+            .fixture(context: .fixture(appName: "Codex", bundleID: "com.openai.codex")),
+            now: .fixture
+        )
+        coordinator.tick(now: .fixture)
+        coordinator.tick(now: .fixture.addingTimeInterval(1))
+
+        let turns = try store.fetchRecent(limit: 10)
+        try expect(turns[0].observedText == "question", "placeholder should not overwrite persisted text")
+        try expect(turns[0].endReason == .textCleared, "placeholder should end the current turn")
+    }
+
     private static func testCaptureCoordinatorPause() throws {
         let store = try TurnStore(path: temporaryDatabasePath())
         let coordinator = CaptureCoordinator(store: store, reader: FakeReader(results: [.readable("draft")]))
@@ -144,10 +181,13 @@ extension Date {
 }
 
 extension CaptureContext {
-    static func fixture() -> CaptureContext {
+    static func fixture(
+        appName: String = "TestApp",
+        bundleID: String = "com.example.TestApp"
+    ) -> CaptureContext {
         CaptureContext(
-            appName: "TestApp",
-            bundleID: "com.example.TestApp",
+            appName: appName,
+            bundleID: bundleID,
             windowTitle: "Test Window",
             controlRole: "AXTextField",
             controlSubrole: nil,
@@ -162,10 +202,10 @@ extension CaptureContext {
 }
 
 extension FocusedTextCandidate {
-    static func fixture() -> FocusedTextCandidate {
+    static func fixture(context: CaptureContext = .fixture()) -> FocusedTextCandidate {
         FocusedTextCandidate(
             element: AXUIElementCreateSystemWide(),
-            context: .fixture()
+            context: context
         )
     }
 }

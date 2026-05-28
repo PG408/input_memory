@@ -52,6 +52,35 @@ final class MarkdownExporterTests: XCTestCase {
         XCTAssertFalse(markdown.contains("- Text Length: 0"))
     }
 
+    func testExportSkipsPlaceholderTurns() throws {
+        let day = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27))!
+        let placeholder = Turn.fixture(
+            observedText: "Ask for follow-up changes",
+            context: .fixture(
+                appName: "Codex",
+                bundleID: "com.openai.codex",
+                controlFingerprint: "codex"
+            ),
+            at: day.addingTimeInterval(60)
+        )
+        let real = Turn.fixture(
+            observedText: "real codex input",
+            context: .fixture(
+                appName: "Codex",
+                bundleID: "com.openai.codex",
+                controlFingerprint: "codex"
+            ),
+            at: day.addingTimeInterval(120)
+        )
+
+        let exporter = MarkdownExporter(store: try TurnStore(path: temporaryDatabasePath()))
+        let markdown = exporter.render(day: day, generatedAt: day, turns: [placeholder, real])
+
+        XCTAssertTrue(markdown.contains("- Turn Count: 1"))
+        XCTAssertTrue(markdown.contains("real codex input"))
+        XCTAssertFalse(markdown.contains("Ask for follow-up changes"))
+    }
+
     func testExportCollapsesAdjacentIdenticalTurnsInSameControl() throws {
         let day = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27))!
         let context = CaptureContext.fixture(controlFingerprint: "same-control")

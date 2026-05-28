@@ -33,10 +33,10 @@ extension CaptureContext {
 }
 
 extension FocusedTextCandidate {
-    static func fixture() -> FocusedTextCandidate {
+    static func fixture(context: CaptureContext = .fixture()) -> FocusedTextCandidate {
         FocusedTextCandidate(
             element: AXUIElementCreateSystemWide(),
-            context: .fixture()
+            context: context
         )
     }
 }
