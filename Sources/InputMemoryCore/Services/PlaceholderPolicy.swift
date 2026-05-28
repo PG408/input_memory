@@ -1,19 +1,18 @@
 import Foundation
 
 public enum PlaceholderPolicy {
-    public static func isPlaceholder(_ text: String, context: CaptureContext) -> Bool {
+    public static func isPlaceholder(
+        _ text: String,
+        context: CaptureContext,
+        rules: [PlaceholderRule] = PlaceholderRuleStore.defaultRules
+    ) -> Bool {
         let normalized = normalizedText(text)
         guard !normalized.isEmpty else {
             return false
         }
 
-        switch context.bundleID {
-        case "com.openai.codex":
-            return normalized == "Ask for follow-up changes"
-        case "com.electron.lark":
-            return normalized == "沟通时请保持“公开可接受”"
-        default:
-            return false
+        return rules.contains { rule in
+            rule.bundleID == context.bundleID && normalizedText(rule.text) == normalized
         }
     }
 

@@ -22,4 +22,20 @@ final class PlaceholderPolicyTests: XCTestCase {
             context: .fixture(appName: "TextEdit", bundleID: "com.apple.TextEdit")
         ))
     }
+
+    func testMatchesCustomRule() {
+        let rules = [
+            PlaceholderRule(
+                appName: "Example",
+                bundleID: "com.example.app",
+                text: "Type a message"
+            )
+        ]
+
+        XCTAssertTrue(PlaceholderPolicy.isPlaceholder(
+            " Type a message ",
+            context: .fixture(appName: "Example", bundleID: "com.example.app"),
+            rules: rules
+        ))
+    }
 }

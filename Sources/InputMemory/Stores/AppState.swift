@@ -10,6 +10,11 @@ final class AppState {
     var selectedTurnID: Int64?
     var statusText = "Not started"
     var currentCaptureStatus = "Idle"
+    var placeholderRules: [PlaceholderRule]
+    var placeholderDraftAppName = ""
+    var placeholderDraftBundleID = ""
+    var placeholderDraftText = ""
+    var placeholderStatusText = ""
 
     var exportHour: Int {
         get {
@@ -27,6 +32,7 @@ final class AppState {
     let store: TurnStore
     let exporter: MarkdownExporter
 
+    private let placeholderRuleStore: PlaceholderRuleStore
     private let foregroundMonitor = ForegroundAppMonitor()
     private let accessibilityClient = AccessibilityClient()
     private var captureCoordinator: CaptureCoordinator?
@@ -39,12 +45,20 @@ final class AppState {
     init(
         permissionService: AccessibilityPermissionService = AccessibilityPermissionService(),
         store: TurnStore,
-        exporter: MarkdownExporter
+        exporter: MarkdownExporter,
+        placeholderRuleStore: PlaceholderRuleStore = PlaceholderRuleStore()
     ) {
         self.permissionService = permissionService
         self.store = store
         self.exporter = exporter
-        self.captureCoordinator = CaptureCoordinator(store: store, reader: accessibilityClient)
+        self.placeholderRuleStore = placeholderRuleStore
+        self.placeholderRules = placeholderRuleStore.load()
+        self.exporter.placeholderRules = placeholderRules
+        self.captureCoordinator = CaptureCoordinator(
+            store: store,
+            reader: accessibilityClient,
+            placeholderRules: placeholderRules
+        )
         try? store.closeUnclosedTurns()
         refreshPermissionStatus()
         refreshRecentTurns()
@@ -62,6 +76,11 @@ final class AppState {
 
     var selectedTurn: Turn? {
         recentTurns.first { $0.id == selectedTurnID }
+    }
+
+    var canAddPlaceholderRule: Bool {
+        !placeholderDraftBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !placeholderDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     func refreshPermissionStatus() {
@@ -89,6 +108,7 @@ final class AppState {
 
     func exportNow() {
         do {
+            exporter.placeholderRules = placeholderRules
             _ = try exporter.exportPreviousDay()
             statusText = "Exported previous day"
         } catch {
@@ -100,6 +120,47 @@ final class AppState {
         recentTurns = (try? store.fetchRecent(limit: 50)) ?? []
     }
 
+    func fillPlaceholderDraftFromSelectedTurn() {
+        guard let selectedTurn else {
+            return
+        }
+        placeholderDraftAppName = selectedTurn.context.appName
+        placeholderDraftBundleID = selectedTurn.context.bundleID
+        placeholderDraftText = selectedTurn.observedText
+    }
+
+    func addPlaceholderRuleFromDraft() {
+        let appName = placeholderDraftAppName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bundleID = placeholderDraftBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = PlaceholderPolicy.normalizedText(placeholderDraftText)
+        guard !bundleID.isEmpty, !text.isEmpty else {
+            placeholderStatusText = "Bundle ID and text are required"
+            return
+        }
+
+        let duplicate = placeholderRules.contains { rule in
+            rule.bundleID == bundleID && PlaceholderPolicy.normalizedText(rule.text) == text
+        }
+        guard !duplicate else {
+            placeholderStatusText = "Rule already exists"
+            return
+        }
+
+        placeholderRules.append(PlaceholderRule(appName: appName.isEmpty ? bundleID : appName, bundleID: bundleID, text: text))
+        persistPlaceholderRules()
+        placeholderDraftText = ""
+    }
+
+    func deletePlaceholderRule(_ rule: PlaceholderRule) {
+        placeholderRules.removeAll { $0.id == rule.id }
+        persistPlaceholderRules()
+    }
+
+    func restoreDefaultPlaceholderRules() {
+        placeholderRules = PlaceholderRuleStore.defaultRules
+        persistPlaceholderRules()
+    }
+
     func startCaptureLoop() {
         guard hasAccessibilityPermission, captureTimer == nil else {
             return
@@ -107,6 +168,7 @@ final class AppState {
         isRecording = true
         statusText = "Recording"
         captureCoordinator?.startRecording()
+        captureCoordinator?.placeholderRules = placeholderRules
         foregroundMonitor.onAppChanged = { [weak self] app in
             self?.handleAppChanged(app)
         }
@@ -158,6 +220,17 @@ final class AppState {
         }
         lastExportKey = key
         exportNow()
+    }
+
+    private func persistPlaceholderRules() {
+        do {
+            try placeholderRuleStore.save(placeholderRules)
+            exporter.placeholderRules = placeholderRules
+            captureCoordinator?.placeholderRules = placeholderRules
+            placeholderStatusText = "Saved"
+        } catch {
+            placeholderStatusText = "Save failed: \(error.localizedDescription)"
+        }
     }
 
     private func handleAppChanged(_ app: ForegroundAppSnapshot?) {

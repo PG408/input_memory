@@ -5,11 +5,17 @@ public final class CaptureCoordinator {
     private let reader: AccessibilityReading
     private var activeTurn: ActiveTurn?
     private var activeCandidate: FocusedTextCandidate?
+    public var placeholderRules: [PlaceholderRule]
     public private(set) var isRecording = false
 
-    public init(store: TurnStore, reader: AccessibilityReading) {
+    public init(
+        store: TurnStore,
+        reader: AccessibilityReading,
+        placeholderRules: [PlaceholderRule] = PlaceholderRuleStore.defaultRules
+    ) {
         self.store = store
         self.reader = reader
+        self.placeholderRules = placeholderRules
     }
 
     public func startRecording() {
@@ -33,7 +39,11 @@ public final class CaptureCoordinator {
         guard let candidate = activeCandidate, var turn = activeTurn else {
             return
         }
-        let transition = turn.applyReadResult(reader.readText(from: candidate), at: now)
+        let transition = turn.applyReadResult(
+            reader.readText(from: candidate),
+            at: now,
+            placeholderRules: placeholderRules
+        )
 
         if turn.databaseID == nil {
             var persisted = makeTurn(from: turn, endedAt: nil, endReason: nil, now: now)

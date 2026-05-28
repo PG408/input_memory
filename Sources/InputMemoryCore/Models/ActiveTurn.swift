@@ -39,10 +39,15 @@ public struct ActiveTurn: Sendable {
     }
 
     @discardableResult
-    public mutating func applyReadResult(_ result: TextReadResult, at date: Date) -> TurnTransition {
+    public mutating func applyReadResult(
+        _ result: TextReadResult,
+        at date: Date,
+        placeholderRules: [PlaceholderRule] = PlaceholderRuleStore.defaultRules
+    ) -> TurnTransition {
         lastObservedAt = date
         let effectiveResult: TextReadResult
-        if case .readable(let text) = result, PlaceholderPolicy.isPlaceholder(text, context: context) {
+        if case .readable(let text) = result,
+           PlaceholderPolicy.isPlaceholder(text, context: context, rules: placeholderRules) {
             effectiveResult = .empty
         } else {
             effectiveResult = result

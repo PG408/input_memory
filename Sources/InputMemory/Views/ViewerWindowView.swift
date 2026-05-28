@@ -8,6 +8,7 @@ struct ViewerWindowView: View {
             VStack(alignment: .leading, spacing: 12) {
                 PermissionView()
                 ExportSettingsView()
+                PlaceholderSettingsView()
                 Text(appState.currentCaptureStatus)
                     .font(.caption)
                     .foregroundStyle(.secondary)

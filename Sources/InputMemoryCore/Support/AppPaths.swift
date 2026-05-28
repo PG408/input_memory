@@ -10,6 +10,10 @@ public enum AppPaths {
         applicationSupportDirectory.appendingPathComponent("input_memory.sqlite")
     }
 
+    public static var placeholderRulesURL: URL {
+        applicationSupportDirectory.appendingPathComponent("placeholders.json")
+    }
+
     public static var defaultExportDirectory: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("InputMemory", isDirectory: true)

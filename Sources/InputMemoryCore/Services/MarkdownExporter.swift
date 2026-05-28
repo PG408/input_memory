@@ -4,15 +4,18 @@ public final class MarkdownExporter {
     private let store: TurnStore
     private let exportDirectory: URL
     private let calendar: Calendar
+    public var placeholderRules: [PlaceholderRule]
 
     public init(
         store: TurnStore,
         exportDirectory: URL = AppPaths.defaultExportDirectory,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        placeholderRules: [PlaceholderRule] = PlaceholderRuleStore.defaultRules
     ) {
         self.store = store
         self.exportDirectory = exportDirectory
         self.calendar = calendar
+        self.placeholderRules = placeholderRules
     }
 
     @discardableResult
@@ -37,7 +40,7 @@ public final class MarkdownExporter {
                 role: turn.context.controlRole,
                 subrole: turn.context.controlSubrole,
                 value: turn.observedText
-            ) && !PlaceholderPolicy.isPlaceholder(turn.observedText, context: turn.context)
+            ) && !PlaceholderPolicy.isPlaceholder(turn.observedText, context: turn.context, rules: placeholderRules)
         }
         let exportTurns = deduplicateAdjacent(filteredTurns)
 
