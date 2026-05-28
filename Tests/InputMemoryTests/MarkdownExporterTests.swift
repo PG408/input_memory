@@ -18,4 +18,44 @@ final class MarkdownExporterTests: XCTestCase {
         XCTAssertTrue(markdown.contains("## TestApp | Test Window"))
         XCTAssertTrue(markdown.contains("```text\n# hello\nbody\n```"))
     }
+
+    func testExportSkipsEmptyAndSensitiveTurns() throws {
+        let day = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27))!
+        let safe = Turn.fixture(
+            observedText: "real input",
+            context: .fixture(),
+            at: day.addingTimeInterval(60)
+        )
+        let empty = Turn.fixture(
+            observedText: "",
+            context: .fixture(controlFingerprint: "empty"),
+            at: day.addingTimeInterval(120)
+        )
+        let secure = Turn.fixture(
+            observedText: "do-not-export",
+            context: .fixture(
+                appName: "loginwindow",
+                bundleID: "com.apple.loginwindow",
+                controlRole: "AXTextField",
+                controlSubrole: "AXSecureTextField",
+                controlFingerprint: "secure"
+            ),
+            at: day.addingTimeInterval(180)
+        )
+
+        let exporter = MarkdownExporter(store: try TurnStore(path: temporaryDatabasePath()))
+        let markdown = exporter.render(day: day, generatedAt: day, turns: [safe, empty, secure])
+
+        XCTAssertTrue(markdown.contains("- Turn Count: 1"))
+        XCTAssertTrue(markdown.contains("real input"))
+        XCTAssertFalse(markdown.contains("do-not-export"))
+        XCTAssertFalse(markdown.contains("- Text Length: 0"))
+    }
+
+    private func temporaryDatabasePath() -> String {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+            .path
+    }
 }

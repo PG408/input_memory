@@ -28,7 +28,19 @@ public final class MarkdownExporter {
     }
 
     func render(day: Date, generatedAt: Date, turns: [Turn]) -> String {
-        let grouped = Dictionary(grouping: turns) { turn in
+        let exportTurns = turns.filter { turn in
+            guard turn.observedTextLength > 0 else { return false }
+            guard turn.captureStatus == .readable else { return false }
+            return !CapturePolicy.shouldSkipCandidate(
+                appName: turn.context.appName,
+                bundleID: turn.context.bundleID,
+                role: turn.context.controlRole,
+                subrole: turn.context.controlSubrole,
+                value: turn.observedText
+            )
+        }
+
+        let grouped = Dictionary(grouping: exportTurns) { turn in
             [
                 turn.context.appName,
                 turn.context.bundleID,
@@ -40,7 +52,7 @@ public final class MarkdownExporter {
             "# InputMemory Export: \(Self.dayFormatter.string(from: day))",
             "",
             "- Generated At: \(Self.timestampFormatter.string(from: generatedAt))",
-            "- Turn Count: \(turns.count)",
+            "- Turn Count: \(exportTurns.count)",
             ""
         ]
 

@@ -7,19 +7,27 @@ extension Date {
 }
 
 extension CaptureContext {
-    static func fixture() -> CaptureContext {
+    static func fixture(
+        appName: String = "TestApp",
+        bundleID: String = "com.example.TestApp",
+        windowTitle: String = "Test Window",
+        controlRole: String? = "AXTextField",
+        controlSubrole: String? = nil,
+        controlFingerprint: String = "fixture",
+        isHeuristicTextControl: Bool = false
+    ) -> CaptureContext {
         CaptureContext(
-            appName: "TestApp",
-            bundleID: "com.example.TestApp",
-            windowTitle: "Test Window",
-            controlRole: "AXTextField",
-            controlSubrole: nil,
+            appName: appName,
+            bundleID: bundleID,
+            windowTitle: windowTitle,
+            controlRole: controlRole,
+            controlSubrole: controlSubrole,
             controlTitle: nil,
             controlDescription: nil,
             controlPathHint: nil,
             controlFrame: nil,
-            controlFingerprint: "fixture",
-            isHeuristicTextControl: false
+            controlFingerprint: controlFingerprint,
+            isHeuristicTextControl: isHeuristicTextControl
         )
     }
 }
@@ -35,19 +43,27 @@ extension FocusedTextCandidate {
 
 extension Turn {
     static func fixture(observedText: String, at date: Date) -> Turn {
+        fixture(observedText: observedText, context: .fixture(), at: date)
+    }
+
+    static func fixture(
+        observedText: String,
+        context: CaptureContext,
+        at date: Date
+    ) -> Turn {
         Turn(
             id: nil,
             observedText: observedText,
             observedTextHash: Hashing.sha256(observedText),
             observedTextLength: observedText.count,
-            context: .fixture(),
+            context: context,
             captureStatus: observedText.isEmpty ? .empty : .readable,
             endedEmpty: observedText.isEmpty,
             everHadNonEmptyText: !observedText.isEmpty,
             startedAt: date,
             lastObservedAt: date,
-            endedAt: nil,
-            endReason: nil,
+            endedAt: date.addingTimeInterval(1),
+            endReason: .focusChanged,
             createdAt: date,
             updatedAt: date
         )
