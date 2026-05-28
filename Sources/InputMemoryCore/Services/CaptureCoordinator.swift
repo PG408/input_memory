@@ -46,13 +46,15 @@ public final class CaptureCoordinator {
         )
 
         if turn.databaseID == nil {
-            var persisted = makeTurn(from: turn, endedAt: nil, endReason: nil, now: now)
-            do {
-                persisted.id = try store.insert(persisted)
-                turn.databaseID = persisted.id
-            } catch {
-                activeTurn = turn
-                return
+            if turn.everHadNonEmptyText {
+                var persisted = makeTurn(from: turn, endedAt: nil, endReason: nil, now: now)
+                do {
+                    persisted.id = try store.insert(persisted)
+                    turn.databaseID = persisted.id
+                } catch {
+                    activeTurn = turn
+                    return
+                }
             }
         } else if turn.dirty {
             do {
@@ -79,6 +81,11 @@ public final class CaptureCoordinator {
         turn.lastObservedAt = date
         let persisted = makeTurn(from: turn, endedAt: date, endReason: reason, now: date)
         if persisted.id == nil {
+            guard turn.everHadNonEmptyText else {
+                activeTurn = nil
+                activeCandidate = nil
+                return
+            }
             var insertable = persisted
             insertable.id = try? store.insert(insertable)
         } else {

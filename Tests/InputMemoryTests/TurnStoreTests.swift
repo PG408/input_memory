@@ -34,6 +34,18 @@ final class TurnStoreTests: XCTestCase {
         XCTAssertEqual(recent[0].endedAt, now)
     }
 
+    func testFetchRecentSkipsEmptyTurns() throws {
+        let store = try TurnStore(path: temporaryDatabasePath())
+        let now = Date.fixture
+        var empty = Turn.fixture(observedText: "", at: now)
+        empty.id = try store.insert(empty)
+        var nonEmpty = Turn.fixture(observedText: "draft", at: now.addingTimeInterval(1))
+        nonEmpty.id = try store.insert(nonEmpty)
+
+        let recent = try store.fetchRecent(limit: 10)
+        XCTAssertEqual(recent.map(\.observedText), ["draft"])
+    }
+
     private func temporaryDatabasePath() -> String {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

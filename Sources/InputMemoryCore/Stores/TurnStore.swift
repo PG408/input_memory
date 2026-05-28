@@ -54,7 +54,7 @@ public final class TurnStore {
     }
 
     public func fetchRecent(limit: Int) throws -> [Turn] {
-        let sql = "SELECT * FROM turns ORDER BY started_at DESC LIMIT ?;"
+        let sql = "SELECT * FROM turns WHERE observed_text_length > 0 ORDER BY started_at DESC LIMIT ?;"
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
             throw StoreError.prepareFailed(message: lastErrorMessage)

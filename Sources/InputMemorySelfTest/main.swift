@@ -10,6 +10,7 @@ enum InputMemorySelfTest {
         try testCloseUnclosedTurns()
         try testMarkdownExporter()
         try testCaptureCoordinatorTextCleared()
+        try testCaptureCoordinatorSkipsEmptyTurn()
         try testCaptureCoordinatorPlaceholder()
         try testCaptureCoordinatorPause()
         print("InputMemorySelfTest passed")
@@ -119,6 +120,17 @@ enum InputMemorySelfTest {
         try expect(turns[0].observedText == "hello", "text_cleared should keep last non-empty text")
         try expect(turns[0].endReason == .textCleared, "empty after non-empty should end as text_cleared")
         try expect(turns[0].endedEmpty, "text_cleared turn should mark endedEmpty")
+    }
+
+    private static func testCaptureCoordinatorSkipsEmptyTurn() throws {
+        let store = try TurnStore(path: temporaryDatabasePath())
+        let coordinator = CaptureCoordinator(store: store, reader: FakeReader(results: [.empty]))
+        coordinator.startCandidate(.fixture(), now: .fixture)
+        coordinator.tick(now: .fixture)
+        coordinator.endActiveTurn(reason: .focusChanged, at: .fixture.addingTimeInterval(1))
+
+        let turns = try store.fetchRecent(limit: 10)
+        try expect(turns.isEmpty, "coordinator should not persist never-non-empty turns")
     }
 
     private static func testCaptureCoordinatorPlaceholder() throws {
