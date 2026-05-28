@@ -8,15 +8,21 @@ struct ViewerWindowView: View {
             VStack(alignment: .leading, spacing: 12) {
                 PermissionView()
                 ExportSettingsView()
-                PlaceholderSettingsView()
                 Text(appState.currentCaptureStatus)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TurnListView()
             }
             .padding()
+            .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
         } detail: {
-            TurnDetailView(turn: appState.selectedTurn)
+            VSplitView {
+                TurnDetailView(turn: appState.selectedTurn)
+                    .frame(minHeight: 180)
+
+                PlaceholderSettingsView()
+                    .frame(minHeight: 360)
+            }
         }
     }
 }
