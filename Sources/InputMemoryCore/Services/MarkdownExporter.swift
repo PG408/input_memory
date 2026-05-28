@@ -28,7 +28,7 @@ public final class MarkdownExporter {
     }
 
     func render(day: Date, generatedAt: Date, turns: [Turn]) -> String {
-        let exportTurns = turns.filter { turn in
+        let filteredTurns = turns.filter { turn in
             guard turn.observedTextLength > 0 else { return false }
             guard turn.captureStatus == .readable else { return false }
             return !CapturePolicy.shouldSkipCandidate(
@@ -39,6 +39,7 @@ public final class MarkdownExporter {
                 value: turn.observedText
             )
         }
+        let exportTurns = deduplicateAdjacent(filteredTurns)
 
         let grouped = Dictionary(grouping: exportTurns) { turn in
             [
@@ -83,6 +84,28 @@ public final class MarkdownExporter {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    private func deduplicateAdjacent(_ turns: [Turn]) -> [Turn] {
+        var result: [Turn] = []
+        var previousKey: String?
+
+        for turn in turns.sorted(by: { $0.startedAt < $1.startedAt }) {
+            let key = [
+                turn.context.bundleID,
+                turn.context.windowTitle,
+                turn.context.controlFingerprint,
+                turn.observedTextHash
+            ].joined(separator: "|")
+
+            if key == previousKey {
+                continue
+            }
+            result.append(turn)
+            previousKey = key
+        }
+
+        return result
     }
 
     private static func fileName(for day: Date) -> String {

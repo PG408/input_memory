@@ -52,6 +52,21 @@ final class MarkdownExporterTests: XCTestCase {
         XCTAssertFalse(markdown.contains("- Text Length: 0"))
     }
 
+    func testExportCollapsesAdjacentIdenticalTurnsInSameControl() throws {
+        let day = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27))!
+        let context = CaptureContext.fixture(controlFingerprint: "same-control")
+        let first = Turn.fixture(observedText: "same text", context: context, at: day.addingTimeInterval(60))
+        let second = Turn.fixture(observedText: "same text", context: context, at: day.addingTimeInterval(120))
+        let changed = Turn.fixture(observedText: "changed text", context: context, at: day.addingTimeInterval(180))
+
+        let exporter = MarkdownExporter(store: try TurnStore(path: temporaryDatabasePath()))
+        let markdown = exporter.render(day: day, generatedAt: day, turns: [first, second, changed])
+
+        XCTAssertTrue(markdown.contains("- Turn Count: 2"))
+        XCTAssertEqual(markdown.components(separatedBy: "same text").count - 1, 1)
+        XCTAssertTrue(markdown.contains("changed text"))
+    }
+
     private func temporaryDatabasePath() -> String {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
