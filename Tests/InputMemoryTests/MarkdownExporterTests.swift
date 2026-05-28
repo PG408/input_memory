@@ -67,6 +67,40 @@ final class MarkdownExporterTests: XCTestCase {
         XCTAssertTrue(markdown.contains("changed text"))
     }
 
+    func testExportNormalizesDynamicBrowserWindowTitles() throws {
+        let day = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27))!
+        let first = Turn.fixture(
+            observedText: "draft one",
+            context: .fixture(
+                appName: "Microsoft Edge",
+                bundleID: "com.microsoft.edgemac",
+                windowTitle: "广告策略 - 飞书云文档 - 内存使用量高 - 1.2 GB - Microsoft Edge",
+                controlFingerprint: "a"
+            ),
+            at: day.addingTimeInterval(60)
+        )
+        let second = Turn.fixture(
+            observedText: "draft two",
+            context: .fixture(
+                appName: "Microsoft Edge",
+                bundleID: "com.microsoft.edgemac",
+                windowTitle: "广告策略 - 飞书云文档 - 睡眠 - Microsoft Edge",
+                controlFingerprint: "b"
+            ),
+            at: day.addingTimeInterval(120)
+        )
+
+        let exporter = MarkdownExporter(store: try TurnStore(path: temporaryDatabasePath()))
+        let markdown = exporter.render(day: day, generatedAt: day, turns: [first, second])
+
+        XCTAssertEqual(
+            markdown.components(separatedBy: "## Microsoft Edge | 广告策略 - 飞书云文档 - Microsoft Edge").count - 1,
+            1
+        )
+        XCTAssertFalse(markdown.contains("内存使用量高"))
+        XCTAssertFalse(markdown.contains("睡眠 -"))
+    }
+
     private func temporaryDatabasePath() -> String {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

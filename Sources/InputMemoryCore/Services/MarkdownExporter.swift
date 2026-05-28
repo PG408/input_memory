@@ -45,7 +45,7 @@ public final class MarkdownExporter {
             [
                 turn.context.appName,
                 turn.context.bundleID,
-                turn.context.windowTitle
+                normalizedWindowTitle(turn.context.windowTitle)
             ].joined(separator: "|")
         }
 
@@ -62,7 +62,7 @@ public final class MarkdownExporter {
                   let first = sessionTurns.first else {
                 continue
             }
-            lines.append("## \(first.context.appName) | \(first.context.windowTitle)")
+            lines.append("## \(first.context.appName) | \(normalizedWindowTitle(first.context.windowTitle))")
             lines.append("")
             lines.append("- Bundle ID: \(first.context.bundleID)")
             lines.append("- Turns: \(sessionTurns.count)")
@@ -93,7 +93,7 @@ public final class MarkdownExporter {
         for turn in turns.sorted(by: { $0.startedAt < $1.startedAt }) {
             let key = [
                 turn.context.bundleID,
-                turn.context.windowTitle,
+                normalizedWindowTitle(turn.context.windowTitle),
                 turn.context.controlFingerprint,
                 turn.observedTextHash
             ].joined(separator: "|")
@@ -106,6 +106,29 @@ public final class MarkdownExporter {
         }
 
         return result
+    }
+
+    private func normalizedWindowTitle(_ title: String) -> String {
+        var normalized = title
+            .replacingOccurrences(
+                of: #"[\u{200B}-\u{200F}\u{202A}-\u{202E}\u{2060}\u{FEFF}]"#,
+                with: "",
+                options: .regularExpression
+            )
+            .replacingOccurrences(
+                of: #"内存使用量高 - [^-]+ - "#,
+                with: "",
+                options: .regularExpression
+            )
+            .replacingOccurrences(of: "睡眠 - ", with: "")
+            .replacingOccurrences(of: "音频正在播放 - ", with: "")
+            .replacingOccurrences(
+                of: #"\s+"#,
+                with: " ",
+                options: .regularExpression
+            )
+        normalized = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized
     }
 
     private static func fileName(for day: Date) -> String {
