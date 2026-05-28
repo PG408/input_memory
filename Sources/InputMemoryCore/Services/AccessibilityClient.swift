@@ -30,10 +30,20 @@ public final class AccessibilityClient: AccessibilityReading {
 
         let axElement = unsafeBitCast(focused, to: AXUIElement.self)
         let role = stringAttribute(kAXRoleAttribute, from: axElement)
+        let subrole = stringAttribute(kAXSubroleAttribute, from: axElement)
         let value = stringAttribute(kAXValueAttribute, from: axElement)
         let isStandard = ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role ?? "")
         let isHeuristic = !isStandard && value != nil
         guard isStandard || isHeuristic else {
+            return nil
+        }
+        guard !CapturePolicy.shouldSkipCandidate(
+            appName: app.appName,
+            bundleID: app.bundleID,
+            role: role,
+            subrole: subrole,
+            value: value
+        ) else {
             return nil
         }
 
@@ -43,7 +53,7 @@ public final class AccessibilityClient: AccessibilityReading {
             bundleID: app.bundleID,
             windowTitle: currentWindowTitle(for: app.processIdentifier),
             controlRole: role,
-            controlSubrole: stringAttribute(kAXSubroleAttribute, from: axElement),
+            controlSubrole: subrole,
             controlTitle: stringAttribute(kAXTitleAttribute, from: axElement),
             controlDescription: stringAttribute(kAXDescriptionAttribute, from: axElement),
             controlPathHint: nil,
