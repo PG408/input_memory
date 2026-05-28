@@ -43,7 +43,22 @@ extension FocusedTextCandidate {
 
 extension Turn {
     static func fixture(observedText: String, at date: Date) -> Turn {
-        fixture(observedText: observedText, context: .fixture(), at: date)
+        Turn(
+            id: nil,
+            observedText: observedText,
+            observedTextHash: Hashing.sha256(observedText),
+            observedTextLength: observedText.count,
+            context: .fixture(),
+            captureStatus: observedText.isEmpty ? .empty : .readable,
+            endedEmpty: observedText.isEmpty,
+            everHadNonEmptyText: !observedText.isEmpty,
+            startedAt: date,
+            lastObservedAt: date,
+            endedAt: nil,
+            endReason: nil,
+            createdAt: date,
+            updatedAt: date
+        )
     }
 
     static func fixture(

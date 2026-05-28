@@ -71,14 +71,18 @@ enum InputMemorySelfTest {
         let targetDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 22))!
         var turn = Turn.fixture(observedText: "# hello\nbody", at: targetDay.addingTimeInterval(3600))
         turn.id = try store.insert(turn)
+        var emptyTurn = Turn.fixture(observedText: "", at: targetDay.addingTimeInterval(7200))
+        emptyTurn.id = try store.insert(emptyTurn)
 
         let exporter = MarkdownExporter(store: store, exportDirectory: directory)
         let outputURL = try exporter.exportPreviousDay(triggeredAt: targetDay.addingTimeInterval(86_400))
 
         let markdown = try String(contentsOf: outputURL, encoding: .utf8)
         try expect(markdown.contains("# InputMemory Export: 2026-05-22"), "export should use previous day")
+        try expect(markdown.contains("- Turn Count: 1"), "export should count only exportable turns")
         try expect(markdown.contains("## TestApp | Test Window"), "export should group by app and window")
         try expect(markdown.contains("```text\n# hello\nbody\n```"), "export should fence observed text")
+        try expect(!markdown.contains("- Text Length: 0"), "export should skip empty turns")
     }
 
     private static func testCaptureCoordinatorTextCleared() throws {
