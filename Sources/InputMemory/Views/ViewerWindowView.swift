@@ -102,6 +102,7 @@ private struct SidebarSettingsDetailView: View {
 
 private struct ExportDetailView: View {
     @Environment(AppState.self) private var appState
+    @State private var exportToast: ExportToastMessage?
 
     var body: some View {
         @Bindable var appState = appState
@@ -157,7 +158,8 @@ private struct ExportDetailView: View {
                         .labelsHidden()
 
                     Button("Export") {
-                        appState.exportSelectedDate()
+                        let didExport = appState.exportSelectedDate()
+                        showExportToast(appState.exportStatusText, isError: !didExport)
                     }
                 }
                 .padding(.vertical, 2)
@@ -175,6 +177,57 @@ private struct ExportDetailView: View {
         .padding(.horizontal, 36)
         .padding(.vertical, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .overlay(alignment: .topTrailing) {
+            if let exportToast {
+                ExportToastView(message: exportToast.message, isError: exportToast.isError)
+                    .padding(.top, 24)
+                    .padding(.trailing, 28)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: exportToast?.id)
+    }
+
+    private func showExportToast(_ message: String, isError: Bool) {
+        let toast = ExportToastMessage(message: message, isError: isError)
+        exportToast = toast
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
+            if exportToast?.id == toast.id {
+                exportToast = nil
+            }
+        }
+    }
+}
+
+private struct ExportToastMessage: Identifiable, Equatable {
+    let id = UUID()
+    let message: String
+    let isError: Bool
+}
+
+private struct ExportToastView: View {
+    let message: String
+    let isError: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: isError ? "xmark.circle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(isError ? .red : .green)
+
+            Text(message)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(.quaternary, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
+        .accessibilityLabel(message)
+        .allowsHitTesting(false)
     }
 }
 

@@ -102,27 +102,33 @@ final class AppState {
         startCaptureLoop()
     }
 
-    func exportNow() {
+    @discardableResult
+    func exportNow() -> Bool {
         do {
             exporter.placeholderRules = placeholderRules
             let outputURL = try exporter.exportPreviousDay()
             statusText = "Exported previous day"
             exportStatusText = "Exported \(outputURL.lastPathComponent)"
+            return true
         } catch {
             statusText = "Export failed: \(error.localizedDescription)"
             exportStatusText = "Export failed: \(error.localizedDescription)"
+            return false
         }
     }
 
-    func exportSelectedDate() {
+    @discardableResult
+    func exportSelectedDate() -> Bool {
         do {
             exporter.placeholderRules = placeholderRules
             let outputURL = try exporter.export(day: manualExportDate)
             statusText = "Exported \(outputURL.lastPathComponent)"
             exportStatusText = "Exported \(outputURL.lastPathComponent)"
+            return true
         } catch {
             statusText = "Export failed: \(error.localizedDescription)"
             exportStatusText = "Export failed: \(error.localizedDescription)"
+            return false
         }
     }
 
