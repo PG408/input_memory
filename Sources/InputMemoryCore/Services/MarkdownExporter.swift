@@ -21,26 +21,41 @@ public final class MarkdownExporter {
     @discardableResult
     public func exportPreviousDay(triggeredAt: Date = Date()) throws -> URL {
         let targetDay = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: triggeredAt))!
+        return try export(day: targetDay, generatedAt: triggeredAt)
+    }
+
+    @discardableResult
+    public func export(day: Date, generatedAt: Date = Date()) throws -> URL {
+        let targetDay = calendar.startOfDay(for: day)
         let turns = try store.fetchTurns(on: targetDay, calendar: calendar)
         try AppPaths.ensureDirectory(exportDirectory)
 
         let outputURL = exportDirectory.appendingPathComponent(Self.fileName(for: targetDay))
-        try render(day: targetDay, generatedAt: triggeredAt, turns: turns)
+        try render(day: targetDay, generatedAt: generatedAt, turns: turns)
             .write(to: outputURL, atomically: true, encoding: .utf8)
         return outputURL
     }
 
     func render(day: Date, generatedAt: Date, turns: [Turn]) -> String {
-        let filteredTurns = turns.filter { turn in
-            guard turn.observedTextLength > 0 else { return false }
-            guard turn.captureStatus == .readable else { return false }
-            return !CapturePolicy.shouldSkipCandidate(
+        let filteredTurns = turns.compactMap { turn -> Turn? in
+            let visibleText = TextSanitizer.visibleText(turn.observedText)
+            guard !visibleText.isEmpty else { return nil }
+            guard turn.captureStatus == .readable else { return nil }
+            guard !CapturePolicy.shouldSkipCandidate(
                 appName: turn.context.appName,
                 bundleID: turn.context.bundleID,
                 role: turn.context.controlRole,
                 subrole: turn.context.controlSubrole,
-                value: turn.observedText
-            ) && !PlaceholderPolicy.isPlaceholder(turn.observedText, context: turn.context, rules: placeholderRules)
+                value: visibleText
+            ), !PlaceholderPolicy.isPlaceholder(visibleText, context: turn.context, rules: placeholderRules) else {
+                return nil
+            }
+
+            var sanitized = turn
+            sanitized.observedText = visibleText
+            sanitized.observedTextHash = Hashing.sha256(visibleText)
+            sanitized.observedTextLength = visibleText.count
+            return sanitized
         }
         let exportTurns = deduplicateAdjacent(filteredTurns)
 

@@ -88,8 +88,10 @@ public final class CaptureCoordinator {
             }
             var insertable = persisted
             insertable.id = try? store.insert(insertable)
+            compactAppendOnlyPreviousTurn(before: insertable)
         } else {
             try? store.update(persisted)
+            compactAppendOnlyPreviousTurn(before: persisted)
         }
         activeTurn = nil
         activeCandidate = nil
@@ -116,5 +118,19 @@ public final class CaptureCoordinator {
             createdAt: active.startedAt,
             updatedAt: now
         )
+    }
+
+    private func compactAppendOnlyPreviousTurn(before turn: Turn) {
+        guard let previous = try? store.fetchPreviousTurnInSameWindow(as: turn),
+              let previousID = previous.id,
+              shouldReplacePreviousTurn(previous, with: turn) else {
+            return
+        }
+        try? store.deleteTurn(id: previousID)
+    }
+
+    private func shouldReplacePreviousTurn(_ previous: Turn, with current: Turn) -> Bool {
+        current.observedText == previous.observedText ||
+            current.observedText.hasPrefix(previous.observedText)
     }
 }

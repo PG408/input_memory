@@ -31,6 +31,24 @@ final class ActiveTurnTests: XCTestCase {
         XCTAssertEqual(transition, .continueTurn)
     }
 
+    func testInvisibleTextDoesNotBecomeObservedText() {
+        var turn = ActiveTurn(context: .fixture())
+        let transition = turn.applyReadResult(.readable("\u{200B}\n\u{200B}"), at: .fixture)
+
+        XCTAssertEqual(turn.observedText, "")
+        XCTAssertFalse(turn.everHadNonEmptyText)
+        XCTAssertEqual(transition, .continueTurn)
+    }
+
+    func testVisibleTextIsSanitizedBeforeStorage() {
+        var turn = ActiveTurn(context: .fixture())
+        turn.applyReadResult(.readable("\u{200B}\nhello\u{200B}\n"), at: .fixture)
+
+        XCTAssertEqual(turn.observedText, "hello")
+        XCTAssertEqual(turn.observedText.count, 5)
+        XCTAssertTrue(turn.everHadNonEmptyText)
+    }
+
     func testPlaceholderDoesNotOverwriteExistingNonEmptyText() {
         var turn = ActiveTurn(context: .fixture(appName: "Codex", bundleID: "com.openai.codex"))
         turn.applyReadResult(.readable("my actual question"), at: .fixture)

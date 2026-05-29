@@ -11,6 +11,7 @@ public final class TurnStore {
         guard sqlite3_open(path, &db) == SQLITE_OK else {
             throw StoreError.openFailed(message: lastErrorMessage)
         }
+        sqlite3_busy_timeout(db, 5_000)
         try migrate()
     }
 
@@ -53,6 +54,41 @@ public final class TurnStore {
         }
     }
 
+    public func deleteTurn(id: Int64) throws {
+        try execute("DELETE FROM turns WHERE id = ?;") { statement in
+            sqlite3_bind_int64(statement, 1, id)
+        }
+    }
+
+    public func fetchPreviousTurnInSameWindow(as turn: Turn) throws -> Turn? {
+        guard let id = turn.id else { throw StoreError.missingID }
+        let sql = """
+        SELECT * FROM turns
+        WHERE id != ?
+            AND app_name = ?
+            AND bundle_id = ?
+            AND window_title = ?
+            AND started_at <= ?
+        ORDER BY started_at DESC, id DESC
+        LIMIT 1;
+        """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StoreError.prepareFailed(message: lastErrorMessage)
+        }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_int64(statement, 1, id)
+        sqlite3_bind_text(statement, 2, turn.context.appName, -1, sqliteTransient)
+        sqlite3_bind_text(statement, 3, turn.context.bundleID, -1, sqliteTransient)
+        sqlite3_bind_text(statement, 4, turn.context.windowTitle, -1, sqliteTransient)
+        sqlite3_bind_double(statement, 5, turn.startedAt.timeIntervalSince1970)
+
+        if sqlite3_step(statement) == SQLITE_ROW {
+            return readTurn(statement)
+        }
+        return nil
+    }
+
     public func fetchRecent(limit: Int) throws -> [Turn] {
         let sql = "SELECT * FROM turns WHERE observed_text_length > 0 ORDER BY started_at DESC LIMIT ?;"
         var statement: OpaquePointer?
@@ -60,11 +96,18 @@ public final class TurnStore {
             throw StoreError.prepareFailed(message: lastErrorMessage)
         }
         defer { sqlite3_finalize(statement) }
-        sqlite3_bind_int(statement, 1, Int32(limit))
+        sqlite3_bind_int(statement, 1, Int32(max(limit * 20, limit)))
 
         var turns: [Turn] = []
         while sqlite3_step(statement) == SQLITE_ROW {
-            turns.append(readTurn(statement))
+            let turn = readTurn(statement)
+            guard TextSanitizer.isMeaningful(turn.observedText) else {
+                continue
+            }
+            turns.append(turn)
+            if turns.count == limit {
+                break
+            }
         }
         return turns
     }
@@ -88,6 +131,28 @@ public final class TurnStore {
         return turns
     }
 
+    public func compactAppendOnlyTurns() throws {
+        let turns = try fetchAllTurnsForCompaction()
+        var lastTurnByContext: [TurnContextKey: Turn] = [:]
+
+        for turn in turns {
+            guard TextSanitizer.isMeaningful(turn.observedText) else {
+                if let id = turn.id {
+                    try deleteTurn(id: id)
+                }
+                continue
+            }
+
+            let key = TurnContextKey(turn: turn)
+            if let previous = lastTurnByContext[key],
+               let previousID = previous.id,
+               shouldReplacePreviousTurn(previous, with: turn) {
+                try deleteTurn(id: previousID)
+            }
+            lastTurnByContext[key] = turn
+        }
+    }
+
     public func closeUnclosedTurns() throws {
         let sql = """
         UPDATE turns
@@ -95,6 +160,27 @@ public final class TurnStore {
         WHERE ended_at IS NULL;
         """
         try execute(sql)
+    }
+
+    private func fetchAllTurnsForCompaction() throws -> [Turn] {
+        let sql = "SELECT * FROM turns ORDER BY started_at ASC, id ASC;"
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw StoreError.prepareFailed(message: lastErrorMessage)
+        }
+        defer { sqlite3_finalize(statement) }
+
+        var turns: [Turn] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            turns.append(readTurn(statement))
+        }
+        return turns
+    }
+
+    private func shouldReplacePreviousTurn(_ previous: Turn, with current: Turn) -> Bool {
+        let previousText = TextSanitizer.visibleText(previous.observedText)
+        let currentText = TextSanitizer.visibleText(current.observedText)
+        return currentText == previousText || currentText.hasPrefix(previousText)
     }
 
     private func migrate() throws {
@@ -148,6 +234,18 @@ public final class TurnStore {
             return String(cString: message)
         }
         return "Unknown SQLite error"
+    }
+}
+
+private struct TurnContextKey: Hashable {
+    let appName: String
+    let bundleID: String
+    let windowTitle: String
+
+    init(turn: Turn) {
+        self.appName = turn.context.appName
+        self.bundleID = turn.context.bundleID
+        self.windowTitle = turn.context.windowTitle
     }
 }
 

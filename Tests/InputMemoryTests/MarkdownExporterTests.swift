@@ -19,6 +19,25 @@ final class MarkdownExporterTests: XCTestCase {
         XCTAssertTrue(markdown.contains("```text\n# hello\nbody\n```"))
     }
 
+    func testExportsSelectedDay() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = try TurnStore(path: directory.appendingPathComponent("test.sqlite").path)
+        let selectedDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 20))!
+        var selectedTurn = Turn.fixture(observedText: "selected day text", at: selectedDay.addingTimeInterval(3600))
+        selectedTurn.id = try store.insert(selectedTurn)
+        var otherTurn = Turn.fixture(observedText: "other day text", at: selectedDay.addingTimeInterval(86_400))
+        otherTurn.id = try store.insert(otherTurn)
+
+        let exporter = MarkdownExporter(store: store, exportDirectory: directory)
+        let outputURL = try exporter.export(day: selectedDay)
+
+        XCTAssertEqual(outputURL.lastPathComponent, "2026-05-20.md")
+        let markdown = try String(contentsOf: outputURL, encoding: .utf8)
+        XCTAssertTrue(markdown.contains("selected day text"))
+        XCTAssertFalse(markdown.contains("other day text"))
+    }
+
     func testExportSkipsEmptyAndSensitiveTurns() throws {
         let day = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27))!
         let safe = Turn.fixture(
@@ -30,6 +49,11 @@ final class MarkdownExporterTests: XCTestCase {
             observedText: "",
             context: .fixture(controlFingerprint: "empty"),
             at: day.addingTimeInterval(120)
+        )
+        let invisible = Turn.fixture(
+            observedText: "\u{200B}",
+            context: .fixture(controlFingerprint: "invisible"),
+            at: day.addingTimeInterval(150)
         )
         let secure = Turn.fixture(
             observedText: "do-not-export",
@@ -44,12 +68,13 @@ final class MarkdownExporterTests: XCTestCase {
         )
 
         let exporter = MarkdownExporter(store: try TurnStore(path: temporaryDatabasePath()))
-        let markdown = exporter.render(day: day, generatedAt: day, turns: [safe, empty, secure])
+        let markdown = exporter.render(day: day, generatedAt: day, turns: [safe, empty, invisible, secure])
 
         XCTAssertTrue(markdown.contains("- Turn Count: 1"))
         XCTAssertTrue(markdown.contains("real input"))
         XCTAssertFalse(markdown.contains("do-not-export"))
         XCTAssertFalse(markdown.contains("- Text Length: 0"))
+        XCTAssertFalse(markdown.contains("\u{200B}"))
     }
 
     func testExportSkipsPlaceholderTurns() throws {

@@ -17,12 +17,6 @@ public enum PlaceholderPolicy {
     }
 
     public static func normalizedText(_ text: String) -> String {
-        text
-            .replacingOccurrences(
-                of: #"[\u{200B}-\u{200F}\u{202A}-\u{202E}\u{2060}\u{FEFF}]"#,
-                with: "",
-                options: .regularExpression
-            )
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        TextSanitizer.visibleText(text)
     }
 }

@@ -34,9 +34,8 @@ struct PlaceholderSettingsView: View {
                             Button {
                                 appState.fillPlaceholderDraftFromSelectedTurn()
                             } label: {
-                                Label("Use Selected Turn", systemImage: "text.badge.plus")
+                                Text("Use Selected Turn")
                             }
-                            .labelStyle(.titleAndIcon)
                             .accessibilityLabel("Use Selected Turn")
                             .help("Use selected turn")
                             .disabled(appState.selectedTurn == nil)
@@ -44,9 +43,8 @@ struct PlaceholderSettingsView: View {
                             Button {
                                 appState.addPlaceholderRuleFromDraft()
                             } label: {
-                                Label("Add Rule", systemImage: "plus")
+                                Text("Add Rule")
                             }
-                            .labelStyle(.titleAndIcon)
                             .accessibilityLabel("Add Rule")
                             .help("Add placeholder rule")
                             .disabled(!appState.canAddPlaceholderRule)
@@ -57,9 +55,8 @@ struct PlaceholderSettingsView: View {
                         Button {
                             appState.restoreDefaultPlaceholderRules()
                         } label: {
-                            Label("Restore Defaults", systemImage: "arrow.counterclockwise")
+                            Text("Restore Defaults")
                         }
-                        .labelStyle(.titleAndIcon)
                         .accessibilityLabel("Restore Defaults")
                         .help("Restore default placeholders")
                     }
@@ -125,9 +122,8 @@ private struct PlaceholderRuleRow: View {
             Spacer()
 
             Button(role: .destructive, action: delete) {
-                Label("Delete", systemImage: "trash")
+                Text("Delete")
             }
-            .labelStyle(.titleAndIcon)
             .accessibilityLabel("Delete placeholder")
             .help("Delete placeholder")
         }

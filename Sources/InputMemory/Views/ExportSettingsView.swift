@@ -5,8 +5,14 @@ struct ExportSettingsView: View {
 
     var body: some View {
         @Bindable var appState = appState
-        Stepper(value: $appState.exportHour, in: 0...23) {
-            Text("Daily Export Hour: \(appState.exportHour):00")
+        HStack(spacing: 8) {
+            Text("\(appState.exportHour):00")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .trailing)
+
+            Stepper("Daily Export Hour", value: $appState.exportHour, in: 0...23)
+                .labelsHidden()
         }
     }
 }

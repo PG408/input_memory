@@ -6,6 +6,12 @@ struct InputMemoryApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
+        WindowGroup("InputMemory", id: "viewer") {
+            ViewerWindowView()
+                .environment(appState)
+                .frame(minWidth: 800, minHeight: 520)
+        }
+
         MenuBarExtra("InputMemory", systemImage: "text.cursor") {
             MenuBarContentView()
                 .environment(appState)
@@ -16,11 +22,5 @@ struct InputMemoryApp: App {
                 }
         }
         .menuBarExtraStyle(.menu)
-
-        WindowGroup("InputMemory", id: "viewer") {
-            ViewerWindowView()
-                .environment(appState)
-                .frame(minWidth: 800, minHeight: 520)
-        }
     }
 }

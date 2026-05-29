@@ -15,16 +15,11 @@ final class AppState {
     var placeholderDraftBundleID = ""
     var placeholderDraftText = ""
     var placeholderStatusText = ""
-
-    var exportHour: Int {
-        get {
-            if UserDefaults.standard.object(forKey: "exportHour") == nil {
-                return 2
-            }
-            return UserDefaults.standard.integer(forKey: "exportHour")
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "exportHour")
+    var manualExportDate = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+    var exportStatusText = ""
+    var exportHour = AppState.loadExportHour() {
+        didSet {
+            UserDefaults.standard.set(exportHour, forKey: Self.exportHourDefaultsKey)
         }
     }
 
@@ -60,6 +55,7 @@ final class AppState {
             placeholderRules: placeholderRules
         )
         try? store.closeUnclosedTurns()
+        try? store.compactAppendOnlyTurns()
         refreshPermissionStatus()
         refreshRecentTurns()
         startExportScheduler()
@@ -109,10 +105,24 @@ final class AppState {
     func exportNow() {
         do {
             exporter.placeholderRules = placeholderRules
-            _ = try exporter.exportPreviousDay()
+            let outputURL = try exporter.exportPreviousDay()
             statusText = "Exported previous day"
+            exportStatusText = "Exported \(outputURL.lastPathComponent)"
         } catch {
             statusText = "Export failed: \(error.localizedDescription)"
+            exportStatusText = "Export failed: \(error.localizedDescription)"
+        }
+    }
+
+    func exportSelectedDate() {
+        do {
+            exporter.placeholderRules = placeholderRules
+            let outputURL = try exporter.export(day: manualExportDate)
+            statusText = "Exported \(outputURL.lastPathComponent)"
+            exportStatusText = "Exported \(outputURL.lastPathComponent)"
+        } catch {
+            statusText = "Export failed: \(error.localizedDescription)"
+            exportStatusText = "Export failed: \(error.localizedDescription)"
         }
     }
 
@@ -220,6 +230,15 @@ final class AppState {
         }
         lastExportKey = key
         exportNow()
+    }
+
+    private static let exportHourDefaultsKey = "exportHour"
+
+    private static func loadExportHour() -> Int {
+        if UserDefaults.standard.object(forKey: exportHourDefaultsKey) == nil {
+            return 2
+        }
+        return UserDefaults.standard.integer(forKey: exportHourDefaultsKey)
     }
 
     private func persistPlaceholderRules() {

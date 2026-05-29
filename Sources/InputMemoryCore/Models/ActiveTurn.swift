@@ -46,9 +46,13 @@ public struct ActiveTurn: Sendable {
     ) -> TurnTransition {
         lastObservedAt = date
         let effectiveResult: TextReadResult
-        if case .readable(let text) = result,
-           PlaceholderPolicy.isPlaceholder(text, context: context, rules: placeholderRules) {
-            effectiveResult = .empty
+        if case .readable(let text) = result {
+            let visibleText = TextSanitizer.visibleText(text)
+            if visibleText.isEmpty || PlaceholderPolicy.isPlaceholder(text, context: context, rules: placeholderRules) {
+                effectiveResult = .empty
+            } else {
+                effectiveResult = .readable(visibleText)
+            }
         } else {
             effectiveResult = result
         }
