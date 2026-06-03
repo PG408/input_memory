@@ -27,13 +27,37 @@ public final class MarkdownExporter {
     @discardableResult
     public func export(day: Date, generatedAt: Date = Date()) throws -> URL {
         let targetDay = calendar.startOfDay(for: day)
+        AppLog.export.info("Markdown export started day=\(Self.dayFormatter.string(from: targetDay), privacy: .public)")
         let turns = try store.fetchTurns(on: targetDay, calendar: calendar)
         try AppPaths.ensureDirectory(exportDirectory)
 
         let outputURL = exportDirectory.appendingPathComponent(Self.fileName(for: targetDay))
-        try render(day: targetDay, generatedAt: generatedAt, turns: turns)
+        let rendered = render(day: targetDay, generatedAt: generatedAt, turns: turns)
+        try rendered
             .write(to: outputURL, atomically: true, encoding: .utf8)
+        AppLog.export.info("Markdown export finished day=\(Self.dayFormatter.string(from: targetDay), privacy: .public) rawTurns=\(turns.count, privacy: .public) bytes=\(rendered.utf8.count, privacy: .public) path=\(outputURL.path, privacy: .private)")
         return outputURL
+    }
+
+    @discardableResult
+    public func export(startDay: Date, endDay: Date, generatedAt: Date = Date()) throws -> [URL] {
+        let start = calendar.startOfDay(for: startDay)
+        let end = calendar.startOfDay(for: endDay)
+        guard start <= end else {
+            throw ExportError.invalidDateRange
+        }
+
+        var outputURLs: [URL] = []
+        var current = start
+        while current <= end {
+            outputURLs.append(try export(day: current, generatedAt: generatedAt))
+            guard let next = calendar.date(byAdding: .day, value: 1, to: current) else {
+                break
+            }
+            current = next
+        }
+        AppLog.export.info("Markdown export range finished start=\(Self.dayFormatter.string(from: start), privacy: .public) end=\(Self.dayFormatter.string(from: end), privacy: .public) files=\(outputURLs.count, privacy: .public)")
+        return outputURLs
     }
 
     func render(day: Date, generatedAt: Date, turns: [Turn]) -> String {
@@ -58,6 +82,7 @@ public final class MarkdownExporter {
             return sanitized
         }
         let exportTurns = deduplicateAdjacent(filteredTurns)
+        AppLog.export.debug("Markdown export render filtered=\(filteredTurns.count, privacy: .public) deduplicated=\(exportTurns.count, privacy: .public)")
 
         let grouped = Dictionary(grouping: exportTurns) { turn in
             [
@@ -168,4 +193,15 @@ public final class MarkdownExporter {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return formatter
     }()
+}
+
+public enum ExportError: Error, LocalizedError {
+    case invalidDateRange
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidDateRange:
+            return "Start date must be before or equal to end date."
+        }
+    }
 }

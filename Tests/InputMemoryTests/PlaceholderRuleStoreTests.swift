@@ -23,6 +23,62 @@ final class PlaceholderRuleStoreTests: XCTestCase {
         XCTAssertEqual(store.load(), rules)
     }
 
+    func testLoadsLegacyRulesAsExactMatch() throws {
+        let url = temporaryRulesURL()
+        let legacyJSON = """
+        [
+          {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "appName": "Example",
+            "bundleID": "com.example.app",
+            "text": "Type a message"
+          }
+        ]
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let rules = PlaceholderRuleStore(url: url).load()
+
+        XCTAssertEqual(rules.first?.matchType, .exact)
+    }
+
+    func testLoadsLegacyRulesAsAppScoped() throws {
+        let url = temporaryRulesURL()
+        let legacyJSON = """
+        [
+          {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "appName": "Example",
+            "bundleID": "com.example.app",
+            "text": "Type a message"
+          }
+        ]
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let rules = PlaceholderRuleStore(url: url).load()
+
+        XCTAssertEqual(rules.first?.scope, .app)
+    }
+
+    func testSavesAndLoadsGlobalRegexRule() throws {
+        let url = temporaryRulesURL()
+        let store = PlaceholderRuleStore(url: url)
+        let rules = [
+            PlaceholderRule(
+                appName: "All Apps",
+                bundleID: "",
+                text: #".{1,4}"#,
+                matchType: .regex,
+                scope: .global
+            )
+        ]
+
+        try store.save(rules)
+
+        XCTAssertEqual(store.load(), rules)
+    }
+
     private func temporaryRulesURL() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

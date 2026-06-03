@@ -18,13 +18,24 @@ public struct FocusedTextCandidate {
 }
 
 public final class AccessibilityClient: AccessibilityReading {
+    private var lastCandidateDiagnosticAt: [String: Date] = [:]
+
     public init() {}
 
     public func focusedTextCandidate(for app: ForegroundAppSnapshot) -> FocusedTextCandidate? {
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+        let focusedResult = AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focused)
+        guard focusedResult == .success,
               let focused else {
+            logCandidateDiagnostic(
+                app: app,
+                reason: "focused_attribute_unavailable",
+                axResult: String(describing: focusedResult),
+                role: nil,
+                subrole: nil,
+                value: nil
+            )
             return nil
         }
 
@@ -35,6 +46,14 @@ public final class AccessibilityClient: AccessibilityReading {
         let isStandard = ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(role ?? "")
         let isHeuristic = !isStandard && value != nil
         guard isStandard || isHeuristic else {
+            logCandidateDiagnostic(
+                app: app,
+                reason: "focused_element_not_text_like",
+                axResult: "success",
+                role: role,
+                subrole: subrole,
+                value: value
+            )
             return nil
         }
         guard !CapturePolicy.shouldSkipCandidate(
@@ -44,6 +63,14 @@ public final class AccessibilityClient: AccessibilityReading {
             subrole: subrole,
             value: value
         ) else {
+            logCandidateDiagnostic(
+                app: app,
+                reason: "focused_element_skipped_by_policy",
+                axResult: "success",
+                role: role,
+                subrole: subrole,
+                value: value
+            )
             return nil
         }
 
@@ -134,5 +161,25 @@ public final class AccessibilityClient: AccessibilityReading {
 
     private func fingerprint(app: ForegroundAppSnapshot, role: String?, frame: String?) -> String {
         Hashing.sha256([app.bundleID, role ?? "", frame ?? ""].joined(separator: "|"))
+    }
+
+    private func logCandidateDiagnostic(
+        app: ForegroundAppSnapshot,
+        reason: String,
+        axResult: String,
+        role: String?,
+        subrole: String?,
+        value: String?
+    ) {
+        let key = [app.bundleID, reason, role ?? "nil", subrole ?? "nil"].joined(separator: "|")
+        let now = Date()
+        if let last = lastCandidateDiagnosticAt[key], now.timeIntervalSince(last) < 5 {
+            return
+        }
+        lastCandidateDiagnosticAt[key] = now
+        let valueSummary = value.map(AppLogMetadata.textSummary) ?? "nil"
+        AppLog.diagnostics.info(
+            "Focused candidate rejected app=\(app.appName, privacy: .public) bundleID=\(app.bundleID, privacy: .public) reason=\(reason, privacy: .public) axResult=\(axResult, privacy: .public) role=\(role ?? "nil", privacy: .public) subrole=\(subrole ?? "nil", privacy: .public) valueSummary=\(valueSummary, privacy: .public)"
+        )
     }
 }

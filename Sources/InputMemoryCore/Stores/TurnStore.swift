@@ -13,6 +13,7 @@ public final class TurnStore {
         }
         sqlite3_busy_timeout(db, 5_000)
         try migrate()
+        AppLog.store.info("SQLite store opened path=\(path, privacy: .private)")
     }
 
     deinit {
@@ -33,7 +34,11 @@ public final class TurnStore {
         try execute(sql) { statement in
             bindTurn(turn, to: statement)
         }
-        return sqlite3_last_insert_rowid(db)
+        let id = sqlite3_last_insert_rowid(db)
+        AppLog.store.debug(
+            "Inserted turn id=\(id, privacy: .public) app=\(turn.context.appName, privacy: .public) bundleID=\(turn.context.bundleID, privacy: .public) window=\(turn.context.windowTitle, privacy: .private) \(AppLogMetadata.textSummary(turn.observedText), privacy: .public)"
+        )
+        return id
     }
 
     public func update(_ turn: Turn) throws {
@@ -52,12 +57,16 @@ public final class TurnStore {
             bindTurn(turn, to: statement)
             sqlite3_bind_int64(statement, 24, id)
         }
+        AppLog.store.debug(
+            "Updated turn id=\(id, privacy: .public) status=\(turn.captureStatus.rawValue, privacy: .public) endReason=\(turn.endReason?.rawValue ?? "active", privacy: .public) \(AppLogMetadata.textSummary(turn.observedText), privacy: .public)"
+        )
     }
 
     public func deleteTurn(id: Int64) throws {
         try execute("DELETE FROM turns WHERE id = ?;") { statement in
             sqlite3_bind_int64(statement, 1, id)
         }
+        AppLog.store.debug("Deleted turn id=\(id, privacy: .public)")
     }
 
     public func fetchPreviousTurnInSameWindow(as turn: Turn) throws -> Turn? {
@@ -131,14 +140,18 @@ public final class TurnStore {
         return turns
     }
 
-    public func compactAppendOnlyTurns() throws {
+    @discardableResult
+    public func compactAppendOnlyTurns() throws -> TurnCompactionResult {
         let turns = try fetchAllTurnsForCompaction()
         var lastTurnByContext: [TurnContextKey: Turn] = [:]
+        var deletedInvisibleCount = 0
+        var deletedAppendOnlyCount = 0
 
         for turn in turns {
             guard TextSanitizer.isMeaningful(turn.observedText) else {
                 if let id = turn.id {
                     try deleteTurn(id: id)
+                    deletedInvisibleCount += 1
                 }
                 continue
             }
@@ -148,18 +161,33 @@ public final class TurnStore {
                let previousID = previous.id,
                shouldReplacePreviousTurn(previous, with: turn) {
                 try deleteTurn(id: previousID)
+                deletedAppendOnlyCount += 1
             }
             lastTurnByContext[key] = turn
         }
+
+        let result = TurnCompactionResult(
+            scannedCount: turns.count,
+            deletedInvisibleCount: deletedInvisibleCount,
+            deletedAppendOnlyCount: deletedAppendOnlyCount
+        )
+        AppLog.store.info(
+            "Compaction finished scanned=\(result.scannedCount, privacy: .public) deletedInvisible=\(result.deletedInvisibleCount, privacy: .public) deletedAppendOnly=\(result.deletedAppendOnlyCount, privacy: .public)"
+        )
+        return result
     }
 
-    public func closeUnclosedTurns() throws {
+    @discardableResult
+    public func closeUnclosedTurns() throws -> Int {
         let sql = """
         UPDATE turns
         SET ended_at = last_observed_at, end_reason = 'crash_unclosed', updated_at = strftime('%s','now')
         WHERE ended_at IS NULL;
         """
         try execute(sql)
+        let changedCount = Int(sqlite3_changes(db))
+        AppLog.store.info("Close unclosed turns changed=\(changedCount, privacy: .public)")
+        return changedCount
     }
 
     private func fetchAllTurnsForCompaction() throws -> [Turn] {
@@ -215,6 +243,7 @@ public final class TurnStore {
         CREATE INDEX IF NOT EXISTS idx_turns_context ON turns(app_name, bundle_id, window_title);
         """
         try execute(sql)
+        AppLog.store.info("SQLite migration finished")
     }
 
     private func execute(_ sql: String, binder: ((OpaquePointer?) -> Void)? = nil) throws {
@@ -235,6 +264,12 @@ public final class TurnStore {
         }
         return "Unknown SQLite error"
     }
+}
+
+public struct TurnCompactionResult: Equatable, Sendable {
+    public let scannedCount: Int
+    public let deletedInvisibleCount: Int
+    public let deletedAppendOnlyCount: Int
 }
 
 private struct TurnContextKey: Hashable {

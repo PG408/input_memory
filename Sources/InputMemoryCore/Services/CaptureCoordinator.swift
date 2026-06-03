@@ -20,19 +20,25 @@ public final class CaptureCoordinator {
 
     public func startRecording() {
         isRecording = true
+        AppLog.capture.info("Coordinator recording started")
     }
 
     public func pause(now: Date = Date()) {
         guard isRecording else {
+            AppLog.capture.info("Coordinator pause ignored because recording is already stopped")
             return
         }
         endActiveTurn(reason: .paused, at: now)
         isRecording = false
+        AppLog.capture.info("Coordinator recording paused")
     }
 
     public func startCandidate(_ candidate: FocusedTextCandidate, now: Date = Date()) {
         activeCandidate = candidate
         activeTurn = ActiveTurn(context: candidate.context, startedAt: now)
+        AppLog.capture.info(
+            "Candidate started app=\(candidate.context.appName, privacy: .public) bundleID=\(candidate.context.bundleID, privacy: .public) window=\(candidate.context.windowTitle, privacy: .private) role=\(candidate.context.controlRole ?? "nil", privacy: .public) fingerprintPrefix=\(AppLogMetadata.prefix(candidate.context.controlFingerprint), privacy: .public)"
+        )
     }
 
     public func tick(now: Date = Date()) {
@@ -51,8 +57,12 @@ public final class CaptureCoordinator {
                 do {
                     persisted.id = try store.insert(persisted)
                     turn.databaseID = persisted.id
+                    AppLog.turn.info(
+                        "Turn inserted id=\(persisted.id ?? 0, privacy: .public) app=\(persisted.context.appName, privacy: .public) bundleID=\(persisted.context.bundleID, privacy: .public) \(AppLogMetadata.textSummary(persisted.observedText), privacy: .public)"
+                    )
                 } catch {
                     activeTurn = turn
+                    AppLog.turn.error("Turn insert failed error=\(error.localizedDescription, privacy: .public)")
                     return
                 }
             }
@@ -61,8 +71,10 @@ public final class CaptureCoordinator {
                 try store.update(makeTurn(from: turn, endedAt: nil, endReason: nil, now: now))
                 turn.dirty = false
                 turn.lastFlushedAt = now
+                AppLog.turn.debug("Turn updated id=\(turn.databaseID ?? 0, privacy: .public) \(AppLogMetadata.textSummary(turn.observedText), privacy: .public)")
             } catch {
                 activeTurn = turn
+                AppLog.turn.error("Turn update failed id=\(turn.databaseID ?? 0, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
                 return
             }
         }
@@ -79,20 +91,31 @@ public final class CaptureCoordinator {
             return
         }
         turn.lastObservedAt = date
-        let persisted = makeTurn(from: turn, endedAt: date, endReason: reason, now: date)
+        var persisted = makeTurn(from: turn, endedAt: date, endReason: reason, now: date)
         if persisted.id == nil {
             guard turn.everHadNonEmptyText else {
+                AppLog.turn.info("Skipped empty turn reason=\(reason.rawValue, privacy: .public)")
                 activeTurn = nil
                 activeCandidate = nil
                 return
             }
-            var insertable = persisted
-            insertable.id = try? store.insert(insertable)
-            compactAppendOnlyPreviousTurn(before: insertable)
+            do {
+                persisted.id = try store.insert(persisted)
+            } catch {
+                AppLog.turn.error("Final turn insert failed reason=\(reason.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+            }
+            compactAppendOnlyPreviousTurn(before: persisted)
         } else {
-            try? store.update(persisted)
+            do {
+                try store.update(persisted)
+            } catch {
+                AppLog.turn.error("Final turn update failed id=\(persisted.id ?? 0, privacy: .public) reason=\(reason.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+            }
             compactAppendOnlyPreviousTurn(before: persisted)
         }
+        AppLog.turn.info(
+            "Turn ended id=\(persisted.id ?? 0, privacy: .public) reason=\(reason.rawValue, privacy: .public) status=\(persisted.captureStatus.rawValue, privacy: .public) endedEmpty=\(persisted.endedEmpty, privacy: .public) \(AppLogMetadata.textSummary(persisted.observedText), privacy: .public)"
+        )
         activeTurn = nil
         activeCandidate = nil
     }
@@ -127,6 +150,7 @@ public final class CaptureCoordinator {
             return
         }
         try? store.deleteTurn(id: previousID)
+        AppLog.turn.info("Deleted append-only previous turn previousID=\(previousID, privacy: .public) currentID=\(turn.id ?? 0, privacy: .public)")
     }
 
     private func shouldReplacePreviousTurn(_ previous: Turn, with current: Turn) -> Bool {

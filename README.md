@@ -24,7 +24,7 @@ This project was built with a vibe coding workflow and substantial AI assistance
 - Filters empty, invisible zero-width text, secure fields, and configured placeholder text.
 - Lets users configure app-specific placeholders from recent records.
 - Exports Markdown for the previous day automatically.
-- Supports manual Markdown export for a selected date.
+- Supports manual Markdown export for a selected date range.
 - Bundles a generated macOS `.icns` app icon.
 
 ## Non-Goals
@@ -121,11 +121,13 @@ Resources/InputMemory.icns
 
 Automatic export writes the previous calendar day.
 
-Manual export lets you select a date in the main window under:
+Manual export lets you select a start date and end date in the main window under:
 
 ```text
 Settings -> Export
 ```
+
+Each day in the selected range is exported as its own Markdown file.
 
 Exported Markdown files are named:
 
@@ -145,9 +147,11 @@ Settings -> Placeholders
 
 You can manually enter:
 
+- Scope: `This App` or `All Apps`
 - App Name
 - Bundle ID
 - Placeholder Text
+- Regular Expression, for rules that should match a pattern
 
 Or select a recent input and use `Use Selected Turn`.
 
@@ -170,6 +174,36 @@ Run the lightweight self-test:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift run InputMemorySelfTest
 ```
+
+## Debug Logs
+
+InputMemory writes debug telemetry to macOS Unified Logging with subsystem:
+
+```text
+local.inputmemory
+```
+
+Stream all InputMemory logs:
+
+```bash
+/usr/bin/log stream --style compact --predicate 'subsystem == "local.inputmemory"'
+```
+
+Inspect recent export logs:
+
+```bash
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "local.inputmemory" && category == "export"'
+```
+
+Inspect recent capture logs:
+
+```bash
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "local.inputmemory" && category == "capture"'
+```
+
+Log categories include `lifecycle`, `permission`, `capture`, `turn`, `store`, `export`, `placeholder`, and `diagnostics`.
+
+Logs are intended for debugging. They do not include raw `observed_text`; text values are represented with length and hash prefix. Window titles and local paths are marked private in Unified Logging.
 
 ## Troubleshooting
 

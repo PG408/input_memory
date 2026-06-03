@@ -26,8 +26,10 @@ public final class PlaceholderRuleStore {
         guard FileManager.default.fileExists(atPath: url.path),
               let data = try? Data(contentsOf: url),
               let rules = try? JSONDecoder().decode([PlaceholderRule].self, from: data) else {
+            AppLog.placeholder.info("Loaded default placeholder rules count=\(Self.defaultRules.count, privacy: .public)")
             return Self.defaultRules
         }
+        AppLog.placeholder.info("Loaded custom placeholder rules count=\(rules.count, privacy: .public) path=\(self.url.path, privacy: .private)")
         return rules
     }
 
@@ -35,5 +37,6 @@ public final class PlaceholderRuleStore {
         try AppPaths.ensureDirectory(url.deletingLastPathComponent())
         let data = try JSONEncoder().encode(rules)
         try data.write(to: url, options: .atomic)
+        AppLog.placeholder.info("Wrote placeholder rules count=\(rules.count, privacy: .public) path=\(self.url.path, privacy: .private)")
     }
 }

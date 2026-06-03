@@ -38,4 +38,100 @@ final class PlaceholderPolicyTests: XCTestCase {
             rules: rules
         ))
     }
+
+    func testRegexRuleMatchesFullNormalizedText() {
+        let rules = [
+            PlaceholderRule(
+                appName: "Example",
+                bundleID: "com.example.app",
+                text: "^Ask for .* changes$",
+                matchType: .regex
+            )
+        ]
+
+        XCTAssertTrue(PlaceholderPolicy.isPlaceholder(
+            "\u{200B}Ask for follow-up changes\n",
+            context: .fixture(appName: "Example", bundleID: "com.example.app"),
+            rules: rules
+        ))
+    }
+
+    func testRegexRuleDoesNotMatchPartialText() {
+        let rules = [
+            PlaceholderRule(
+                appName: "Example",
+                bundleID: "com.example.app",
+                text: "follow-up",
+                matchType: .regex
+            )
+        ]
+
+        XCTAssertFalse(PlaceholderPolicy.isPlaceholder(
+            "Ask for follow-up changes",
+            context: .fixture(appName: "Example", bundleID: "com.example.app"),
+            rules: rules
+        ))
+    }
+
+    func testInvalidRegexRuleDoesNotMatch() {
+        let rules = [
+            PlaceholderRule(
+                appName: "Example",
+                bundleID: "com.example.app",
+                text: "[",
+                matchType: .regex
+            )
+        ]
+
+        XCTAssertFalse(PlaceholderPolicy.isPlaceholder(
+            "[",
+            context: .fixture(appName: "Example", bundleID: "com.example.app"),
+            rules: rules
+        ))
+    }
+
+    func testGlobalExactRuleMatchesDifferentApps() {
+        let rules = [
+            PlaceholderRule(
+                appName: "All Apps",
+                bundleID: "",
+                text: "placeholder",
+                scope: .global
+            )
+        ]
+
+        XCTAssertTrue(PlaceholderPolicy.isPlaceholder(
+            "placeholder",
+            context: .fixture(appName: "TextEdit", bundleID: "com.apple.TextEdit"),
+            rules: rules
+        ))
+        XCTAssertTrue(PlaceholderPolicy.isPlaceholder(
+            "placeholder",
+            context: .fixture(appName: "Codex", bundleID: "com.openai.codex"),
+            rules: rules
+        ))
+    }
+
+    func testGlobalRegexRuleMatchesDifferentApps() {
+        let rules = [
+            PlaceholderRule(
+                appName: "All Apps",
+                bundleID: "",
+                text: #"(?!(?=.*[\p{Han}A-Za-z0-9])).{1,4}"#,
+                matchType: .regex,
+                scope: .global
+            )
+        ]
+
+        XCTAssertTrue(PlaceholderPolicy.isPlaceholder(
+            "@@@",
+            context: .fixture(appName: "TextEdit", bundleID: "com.apple.TextEdit"),
+            rules: rules
+        ))
+        XCTAssertFalse(PlaceholderPolicy.isPlaceholder(
+            "abc",
+            context: .fixture(appName: "TextEdit", bundleID: "com.apple.TextEdit"),
+            rules: rules
+        ))
+    }
 }

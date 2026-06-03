@@ -9,9 +9,11 @@ enum InputMemorySelfTest {
         try testTurnStoreInsertUpdate()
         try testCloseUnclosedTurns()
         try testMarkdownExporter()
+        try testMarkdownExporterDateRange()
         try testCaptureCoordinatorTextCleared()
         try testCaptureCoordinatorSkipsEmptyTurn()
         try testCaptureCoordinatorPlaceholder()
+        try testCaptureCoordinatorGlobalRegexPlaceholder()
         try testCaptureCoordinatorPause()
         print("InputMemorySelfTest passed")
     }
@@ -105,6 +107,27 @@ enum InputMemorySelfTest {
         try expect(!markdown.contains("- Text Length: 0"), "export should skip empty turns")
     }
 
+    private static func testMarkdownExporterDateRange() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = try TurnStore(path: directory.appendingPathComponent("test.sqlite").path)
+        let startDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 20))!
+        let endDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 22))!
+        var firstTurn = Turn.fixture(observedText: "first range day", at: startDay.addingTimeInterval(3600))
+        firstTurn.id = try store.insert(firstTurn)
+        var lastTurn = Turn.fixture(observedText: "last range day", at: endDay.addingTimeInterval(3600))
+        lastTurn.id = try store.insert(lastTurn)
+
+        let exporter = MarkdownExporter(store: store, exportDirectory: directory)
+        let outputURLs = try exporter.export(startDay: startDay, endDay: endDay)
+
+        try expect(outputURLs.count == 3, "range export should create one file per day")
+        try expect(outputURLs[0].lastPathComponent == "2026-05-20.md", "range export should start on selected start day")
+        try expect(outputURLs[2].lastPathComponent == "2026-05-22.md", "range export should end on selected end day")
+        let middlePath = directory.appendingPathComponent("2026-05-21.md").path
+        try expect(FileManager.default.fileExists(atPath: middlePath), "range export should include days without turns")
+    }
+
     private static func testCaptureCoordinatorTextCleared() throws {
         let store = try TurnStore(path: temporaryDatabasePath())
         let coordinator = CaptureCoordinator(
@@ -149,6 +172,32 @@ enum InputMemorySelfTest {
         let turns = try store.fetchRecent(limit: 10)
         try expect(turns[0].observedText == "question", "placeholder should not overwrite persisted text")
         try expect(turns[0].endReason == .textCleared, "placeholder should end the current turn")
+    }
+
+    private static func testCaptureCoordinatorGlobalRegexPlaceholder() throws {
+        let store = try TurnStore(path: temporaryDatabasePath())
+        let coordinator = CaptureCoordinator(
+            store: store,
+            reader: FakeReader(results: [.readable("@@@")]),
+            placeholderRules: [
+                PlaceholderRule(
+                    appName: "All Apps",
+                    bundleID: "",
+                    text: #"(?!(?=.*[\p{Han}A-Za-z0-9])).{1,4}"#,
+                    matchType: .regex,
+                    scope: .global
+                )
+            ]
+        )
+        coordinator.startCandidate(
+            .fixture(context: .fixture(appName: "Other", bundleID: "com.example.Other")),
+            now: .fixture
+        )
+        coordinator.tick(now: .fixture)
+        coordinator.endActiveTurn(reason: .focusChanged, at: .fixture.addingTimeInterval(1))
+
+        let turns = try store.fetchRecent(limit: 10)
+        try expect(turns.isEmpty, "global regex placeholder should filter matching text in any app")
     }
 
     private static func testCaptureCoordinatorPause() throws {

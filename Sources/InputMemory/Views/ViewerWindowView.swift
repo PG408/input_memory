@@ -144,21 +144,33 @@ private struct ExportDetailView: View {
 
                 HStack(alignment: .center, spacing: 24) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Selected date")
+                        Text("Date range")
                             .font(.subheadline.weight(.medium))
-                        Text("Exports records captured on this calendar day.")
+                        Text("Exports one Markdown file per selected day.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
-                    DatePicker("", selection: $appState.manualExportDate, displayedComponents: .date)
-                        .datePickerStyle(.field)
-                        .labelsHidden()
+                    HStack(alignment: .center, spacing: 10) {
+                        Text("Start")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        DatePicker("", selection: $appState.manualExportStartDate, displayedComponents: .date)
+                            .datePickerStyle(.field)
+                            .labelsHidden()
 
-                    Button("Export") {
-                        let didExport = appState.exportSelectedDate()
+                        Text("End")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        DatePicker("", selection: $appState.manualExportEndDate, displayedComponents: .date)
+                            .datePickerStyle(.field)
+                            .labelsHidden()
+                    }
+
+                    Button("Export Range") {
+                        let didExport = appState.exportSelectedRange()
                         showExportToast(appState.exportStatusText, isError: !didExport)
                     }
                 }

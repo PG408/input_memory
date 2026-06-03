@@ -38,6 +38,40 @@ final class MarkdownExporterTests: XCTestCase {
         XCTAssertFalse(markdown.contains("other day text"))
     }
 
+    func testExportsSelectedDateRangeAsOneFilePerDay() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = try TurnStore(path: directory.appendingPathComponent("test.sqlite").path)
+        let startDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 20))!
+        let endDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 22))!
+        var firstTurn = Turn.fixture(observedText: "first day text", at: startDay.addingTimeInterval(3600))
+        firstTurn.id = try store.insert(firstTurn)
+        var lastTurn = Turn.fixture(observedText: "last day text", at: endDay.addingTimeInterval(3600))
+        lastTurn.id = try store.insert(lastTurn)
+
+        let exporter = MarkdownExporter(store: store, exportDirectory: directory)
+        let outputURLs = try exporter.export(startDay: startDay, endDay: endDay)
+
+        XCTAssertEqual(outputURLs.map(\.lastPathComponent), [
+            "2026-05-20.md",
+            "2026-05-21.md",
+            "2026-05-22.md"
+        ])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("2026-05-21.md").path))
+        let firstMarkdown = try String(contentsOf: directory.appendingPathComponent("2026-05-20.md"), encoding: .utf8)
+        let lastMarkdown = try String(contentsOf: directory.appendingPathComponent("2026-05-22.md"), encoding: .utf8)
+        XCTAssertTrue(firstMarkdown.contains("first day text"))
+        XCTAssertTrue(lastMarkdown.contains("last day text"))
+    }
+
+    func testExportRejectsInvalidDateRange() throws {
+        let exporter = MarkdownExporter(store: try TurnStore(path: temporaryDatabasePath()))
+        let startDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 22))!
+        let endDay = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 20))!
+
+        XCTAssertThrowsError(try exporter.export(startDay: startDay, endDay: endDay))
+    }
+
     func testExportSkipsEmptyAndSensitiveTurns() throws {
         let day = Calendar.current.date(from: DateComponents(year: 2026, month: 5, day: 27))!
         let safe = Turn.fixture(

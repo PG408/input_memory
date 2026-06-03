@@ -13,24 +13,32 @@ struct PlaceholderSettingsView: View {
                     Text("Add Placeholder")
                         .font(.headline)
 
-                    PlaceholderField(title: "App Name") {
-                        TextField("Codex", text: $appState.placeholderDraftAppName)
-                            .textFieldStyle(.roundedBorder)
-                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("This App")
+                            .font(.subheadline.weight(.semibold))
 
-                    PlaceholderField(title: "Bundle ID") {
-                        TextField("com.openai.codex", text: $appState.placeholderDraftBundleID)
-                            .textFieldStyle(.roundedBorder)
-                    }
+                        PlaceholderField(title: "App Name") {
+                            TextField("Codex", text: $appState.placeholderDraftAppName)
+                                .textFieldStyle(.roundedBorder)
+                        }
 
-                    PlaceholderField(title: "Placeholder Text") {
-                        TextField("Ask for follow-up changes", text: $appState.placeholderDraftText, axis: .vertical)
-                            .textFieldStyle(.roundedBorder)
-                            .lineLimit(3...6)
-                    }
+                        PlaceholderField(title: "Bundle ID") {
+                            TextField("com.openai.codex", text: $appState.placeholderDraftBundleID)
+                                .textFieldStyle(.roundedBorder)
+                        }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
+                        PlaceholderField(title: "Placeholder Text") {
+                            TextField("Ask for follow-up changes", text: $appState.placeholderDraftText, axis: .vertical)
+                                .textFieldStyle(.roundedBorder)
+                                .lineLimit(3...5)
+                        }
+
+                        HStack(alignment: .center, spacing: 12) {
+                            Toggle("Regular Expression", isOn: $appState.placeholderDraftUsesRegex)
+                                .toggleStyle(.checkbox)
+
+                            Spacer()
+
                             Button {
                                 appState.fillPlaceholderDraftFromSelectedTurn()
                             } label: {
@@ -39,26 +47,48 @@ struct PlaceholderSettingsView: View {
                             .accessibilityLabel("Use Selected Turn")
                             .help("Use selected turn")
                             .disabled(appState.selectedTurn == nil)
+                            .buttonStyle(.bordered)
 
                             Button {
-                                appState.addPlaceholderRuleFromDraft()
+                                appState.addAppPlaceholderRuleFromDraft()
                             } label: {
                                 Text("Add Rule")
                             }
-                            .accessibilityLabel("Add Rule")
-                            .help("Add placeholder rule")
-                            .disabled(!appState.canAddPlaceholderRule)
+                            .accessibilityLabel("Add app placeholder rule")
+                            .help("Add app placeholder rule")
+                            .disabled(!appState.canAddAppPlaceholderRule)
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("All Apps")
+                            .font(.subheadline.weight(.semibold))
+
+                        PlaceholderField(title: "Placeholder Text") {
+                            TextField("Short global pattern", text: $appState.globalPlaceholderDraftText, axis: .vertical)
+                                .textFieldStyle(.roundedBorder)
+                                .lineLimit(2...4)
+                        }
+
+                        HStack(alignment: .center, spacing: 12) {
+                            Toggle("Regular Expression", isOn: $appState.globalPlaceholderDraftUsesRegex)
+                                .toggleStyle(.checkbox)
 
                             Spacer()
-                        }
 
-                        Button {
-                            appState.restoreDefaultPlaceholderRules()
-                        } label: {
-                            Text("Restore Defaults")
+                            Button {
+                                appState.addGlobalPlaceholderRuleFromDraft()
+                            } label: {
+                                Text("Add Rule")
+                            }
+                            .accessibilityLabel("Add global placeholder rule")
+                            .help("Add global placeholder rule")
+                            .disabled(!appState.canAddGlobalPlaceholderRule)
+                            .buttonStyle(.borderedProminent)
                         }
-                        .accessibilityLabel("Restore Defaults")
-                        .help("Restore default placeholders")
                     }
 
                     if !appState.placeholderStatusText.isEmpty {
@@ -110,10 +140,20 @@ private struct PlaceholderRuleRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(rule.appName.isEmpty ? rule.bundleID : rule.appName)
                     .font(.headline)
-                Text(rule.bundleID)
+                Text(rule.scope == .global ? "All apps" : rule.bundleID)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
+                if rule.scope == .global {
+                    Text("Global")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if rule.matchType == .regex {
+                    Text("Regular expression")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text(rule.text)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)

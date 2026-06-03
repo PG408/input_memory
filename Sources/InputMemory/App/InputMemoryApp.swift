@@ -12,7 +12,7 @@ struct InputMemoryApp: App {
                 .frame(minWidth: 800, minHeight: 520)
         }
 
-        MenuBarExtra("InputMemory", systemImage: "text.cursor") {
+        MenuBarExtra {
             MenuBarContentView()
                 .environment(appState)
                 .onAppear {
@@ -20,6 +20,12 @@ struct InputMemoryApp: App {
                         appState.shutdown()
                     }
                 }
+        } label: {
+            Label {
+                Text("InputMemory")
+            } icon: {
+                Image(nsImage: StatusBarIcon.image)
+            }
         }
         .menuBarExtraStyle(.menu)
     }

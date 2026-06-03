@@ -19,6 +19,7 @@ public final class ForegroundAppMonitor {
     public init() {}
 
     public func start() {
+        AppLog.capture.info("Foreground app monitor started")
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(activeApplicationChanged(_:)),
@@ -30,6 +31,7 @@ public final class ForegroundAppMonitor {
 
     public func stop() {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        AppLog.capture.info("Foreground app monitor stopped")
     }
 
     public func currentAppSnapshot() -> ForegroundAppSnapshot? {
